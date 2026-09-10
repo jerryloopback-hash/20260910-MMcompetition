@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+.ipynb_checkpoints/
+
+# Windows
+Thumbs.db
+desktop.ini
+
+# macOS
+.DS_Store
+
+# Office 临时文件
+~$*.doc
+~$*.docx
+.~lock.*
+
+# 编辑器
+.idea/
+.vscode/
