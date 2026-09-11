@@ -8,10 +8,11 @@
 \usepackage[font=small]{caption}
 \graphicspath{{figs/}}
 
-% 中文字体（系统 Noto CJK）
-\setCJKmainfont[BoldFont={Noto Serif CJK SC Bold}]{Noto Serif CJK SC}
-\setCJKsansfont{Noto Sans CJK SC}
-\setCJKmonofont{Noto Sans Mono CJK SC}
+% 中文字体（宋体正文，黑体加粗；西文 Times New Roman）
+\setCJKmainfont[BoldFont={SimHei}]{SimSun}
+\setCJKsansfont{SimHei}
+\setCJKmonofont{SimSun}
+\setmainfont{Times New Roman}
 
 \setstretch{1.25}
 \ctexset{
@@ -69,13 +70,14 @@
 \toprule
 符号 & 说明 \\
 \midrule
-$\Delta t$ & 单时段长度，10 min，即 $1/6$ h \\
+$\Delta t$ & 单时段长度，10 min \\
 $\lambda_t$ & 时段 $t$ 的外网电价，元/kWh \\
 $L_t$ & 时段 $t$ 的小区负载，kW \\
 $P_t^{\mathrm{pv}}$ & 时段 $t$ 的光伏发电预测功率，kW \\
-$a_t,\ b_t$ & 时段 $t$ 购电功率：直供负载 / 充电，kW \\
-$g_t,\ c_t$ & 时段 $t$ 光伏功率：直供负载 / 充电，kW \\
-$d_t,\ q_t$ & 时段 $t$ 储能放电功率，并网侧 / 弃光功率，kW \\
+$a_t,\ b_t$ & 时段 $t$ 购电功率中直供部分 / 充电部分，kW \\
+$g_t,\ c_t$ & 时段 $t$ 光伏功率中直供部分 / 充电部分，kW \\
+$q_t$ & 时段 $t$ 光伏弃光功率，kW \\
+$d_t$ & 时段 $t$ 储能放电功率，kW \\
 $E_t$ & 时段 $t$ 末储电量，kWh \\
 $\eta$ & 充放电效率，取 0.9 \\
 $E_0,\ E_{\min},\ E_{\max}$ & 储电量初值与界限：6000、1200、10800 kWh \\
@@ -85,7 +87,6 @@ $\gamma_t,\ \sigma_t$ & 节点边际价值 / 边际供电成本，元/kWh \\
 \end{tabular}
 \end{center}
 }
-其余局部符号在首次出现处说明。
 
 % ===================== 5 问题1 =====================
 \section{问题1模型的建立与求解}
@@ -98,40 +99,55 @@ $\gamma_t,\ \sigma_t$ & 节点边际价值 / 边际供电成本，元/kWh \\
 
 \subsection{LP模型建立}
 
-购电与光伏的价格不同，前者收费、后者免费；它们的去向还决定损耗是否发生，直供负载不经过储能，充入储能则要打九折。因此我们把每段的购电拆成直供 $a_t$ 与充电 $b_t$ 两路，光伏拆成直供 $g_t$ 与充电 $c_t$ 两路，再加上储能放电 $d_t$ 与弃光 $q_t$，共六个非负功率变量，储电量 $E_t$ 由充放电累计得到。
+在本问的微网为小区负载的场景下，构建每个时刻的电能流是理解各购电、充放电和供电的关键所在：
 
-全天购电费为各段电价乘以购电量之和，目标函数为
+\textbf{外网购电} \ \  作为最基本的电能来源，可以规划从外界直接购入的购电量，并在较长的时间窗口满足外界总购电量略多于总负载的用电量，稍多的部分会在储能设备转化时损耗。
+外网购电可能根据存贮计划分流，一部分可转向储电设备并以90%的效率存储 $b_t$ ，另一部分考虑可以直接转向小区负载供电 $a_t$ 以减少损耗率；
+
+\textbf{光伏发电} \ \  类似的，小区内光伏发电的功率同样进行拆分，拆成直供负载的 $g_t$ 与储能充电 $c_t$ 两路，后者同样存在90\%效率的能量转换。
+而由于光伏发电为被动来源，在储能设备几乎存满且负载低的极端情况下，可能出现废弃的光能功率
+
+\textbf{储能供电} \ \  储能设备可以将通过外购和光伏存入的能量再以90\%的效率输出，为小区负载功能。我们记放电总功率为 $d_t$。同时，每个时刻的储电量 $E_t$ 由充放电累计得到
+
+全天购电费为各段电价乘以购电量之和，针对购电成本的目标函数为
 \begin{equation}
 \min\ F=\sum_{t=1}^{144}\lambda_t\,(a_t+b_t)\,\Delta t .
 \label{eq:obj}
 \end{equation}
 
-约束分四组。其一是逐段供电平衡，微网供给不得低于负载，又因多供无益，取等式
+本场景中涉及的基本约束包括：
+
+\textbf{供电平衡}\ \  考虑到微网供给不得低于负载，又由于多供无益。在所有时刻维持总供电刚好满足需求负载，取等式
 \begin{equation}
 a_t+g_t+d_t=L_t .
 \label{eq:load}
 \end{equation}
-其二是光伏电量平衡，出力要么被用掉、要么被储存、要么弃掉：
+
+\textbf{光伏电量平衡}\ \  根据电能流的梳理，光伏发电分流到直供负载、储电以及极端情况的废弃量，即
 \begin{equation}
 g_t+c_t+q_t=P_t^{\mathrm{pv}} .
 \label{eq:pv}
 \end{equation}
-其三是储能动态，按假设~2 的效率口径，时段 $t$ 末储电量满足
+
+\textbf{储能动态}\ \  对于储能设备而言，每一个时刻的储电量变化需考虑所有充放电路径。由于其充放电效率为 90\% ，迭代时注意存在损耗，即
 \begin{equation}
 E_t=E_{t-1}+0.9\,(b_t+c_t)\,\Delta t-\frac{d_t}{0.9}\,\Delta t ,
 \label{eq:soc}
 \end{equation}
-并受电量界限
+
+\textbf{储电量约束}\ \  为保护设备在长期运转的健康水平，每个时刻的储电量需要避免过高或过低
 \begin{equation}
 1200\le E_t\le 10800
 \label{eq:ebnd}
 \end{equation}
-与并网侧功率界限 $b_t+c_t\le 5000$、$d_t\le 5000$~kW 约束，后者按假设~3 对两个方向对称施加。其四是边界条件：附录~1 给定首日 0:00 电量 6000~kWh，即 $E_0=6000$；又因电价与负载逐日相同、计划逐日执行，题面要求 0:00 与 24:00 储电量相同，其唯一可行取值就是 6000，故
+同时，充放电在单位时间的功率也存在界限，采用行业常用的并网侧约束，即损耗之前进行约束  $b_t+c_t\le 5000$、$d_t\le 5000$~kW 。
+
+\textbf{边界条件}\ \  本场景给定首日 0:00 电量 6000~kWh，即 $E_0=6000$；且因电价与负载逐日相同、计划逐日执行，保证 0:00 与 24:00 储电量相同均为 6000，故
 \begin{equation}
 E_0=E_{144}=6000\ \mathrm{kWh} .
 \label{eq:bd}
 \end{equation}
-变量非负隐含 $d_t\le L_t$，放电不会超过负载，不发生向外的反送。
+其中，变量非负隐含 $d_t\le L_t$，放电不会超过负载，不发生向外的反送。
 
 把式~\eqref{eq:obj}至式~\eqref{eq:bd}归并，问题~1 的完整模型为
 \begin{equation}
