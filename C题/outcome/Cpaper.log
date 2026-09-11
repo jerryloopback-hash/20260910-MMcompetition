@@ -1,8 +1,4 @@
-<<<<<<< Updated upstream
-This is XeTeX, Version 3.141592653-2.6-0.999997 (MiKTeX 25.12) (preloaded format=xelatex 2026.5.2)  11 SEP 2026 22:36
-=======
-This is XeTeX, Version 3.141592653-2.6-0.999997 (MiKTeX 25.12) (preloaded format=xelatex 2026.5.2)  11 SEP 2026 22:26
->>>>>>> Stashed changes
+This is XeTeX, Version 3.141592653-2.6-0.999997 (MiKTeX 25.12) (preloaded format=xelatex 2026.5.2)  11 SEP 2026 23:00
 entering extended mode
  restricted \write18 enabled.
  %&-line parsing enabled.
@@ -820,41 +816,29 @@ File: umsb.fd 2013/01/14 v3.01 AMS symbols B
 LaTeX Font Info:    Font shape `TU/TimesNewRoman(0)/m/sl' in size <12.045> not 
 available
 (Font)              Font shape `TU/TimesNewRoman(0)/m/it' tried instead on inpu
-t line 89.
+t line 58.
 
 
 LaTeX Font Warning: Font shape `TU/SimSun(0)/m/sl' undefined
-(Font)              using `TU/SimSun(0)/m/n' instead on input line 89.
+(Font)              using `TU/SimSun(0)/m/n' instead on input line 58.
 
 [1
 
-<<<<<<< Updated upstream
-]
+] [2]
 File: p1_workflow.png Graphic file (type bmp)
 <p1_workflow.png>
- [2] [3] [4]
+ [3] [4] [5]
 File: figs/fig2_dispatch.png Graphic file (type bmp)
 <figs/fig2_dispatch.png>
- [5] [6]
+ [6] [7]
 File: figs/fig3_shadow.png Graphic file (type bmp)
 <figs/fig3_shadow.png>
- [7] [8] (Cpaper.aux)
-=======
-] [2] [3] [4]
-File: figs/fig2_dispatch.png Graphic file (type bmp)
-<figs/fig2_dispatch.png>
- [5]
-File: figs/fig3_shadow.png Graphic file (type bmp)
-<figs/fig3_shadow.png>
- [6] [7] [8] [9] [10]
+ [8] [9] [10]
 File: figs/fig4_p2_groups.png Graphic file (type bmp)
 <figs/fig4_p2_groups.png>
-File: figs/fig5_p2_tau.png Graphic file (type bmp)
-<figs/fig5_p2_tau.png>
 File: figs/fig6_p2_monthly.png Graphic file (type bmp)
 <figs/fig6_p2_monthly.png>
- [11] [12] [13] [14] (Cpaper.aux)
->>>>>>> Stashed changes
+ [11] [12] [13] (Cpaper.aux)
  ***********
 LaTeX2e <2025-11-01>
 L3 programming layer <2022/07/14>
@@ -865,24 +849,12 @@ LaTeX Font Warning: Some font shapes were not available, defaults substituted.
 
  ) 
 Here is how much of TeX's memory you used:
-<<<<<<< Updated upstream
- 10454 strings out of 402987
- 269166 string characters out of 5448318
- 686402 words of memory out of 5000000
- 39019 multiletter control sequences out of 15000+600000
- 637175 words of font info for 113 fonts, out of 8000000 for 9000
+ 10533 strings out of 402987
+ 272329 string characters out of 5448318
+ 690402 words of memory out of 5000000
+ 39094 multiletter control sequences out of 15000+600000
+ 637191 words of font info for 115 fonts, out of 8000000 for 9000
  1348 hyphenation exceptions out of 8191
- 93i,10n,95p,483b,411s stack positions out of 10000i,1000n,20000p,200000b,200000s
+ 93i,10n,95p,621b,440s stack positions out of 10000i,1000n,20000p,200000b,200000s
 
-Output written on Cpaper.pdf (8 pages).
-=======
- 10506 strings out of 402987
- 270406 string characters out of 5448318
- 687402 words of memory out of 5000000
- 39066 multiletter control sequences out of 15000+600000
- 637199 words of font info for 116 fonts, out of 8000000 for 9000
- 1348 hyphenation exceptions out of 8191
- 93i,10n,95p,517b,440s stack positions out of 10000i,1000n,20000p,200000b,200000s
-
-Output written on Cpaper.pdf (14 pages).
->>>>>>> Stashed changes
+Output written on Cpaper.pdf (13 pages).
