@@ -18,7 +18,8 @@ v2（日历对齐修订版）相对初版（v1）的改动：
 4. 新增对偶/影子价格提取、KKT 阈值互补松弛校验，并用有限差分重解抽样验证对偶符号
    （p1_model.md 第 9 节）。
 5. 路径改为相对本文件定位，去除硬编码盘符。
-注意：本目录现有 result1.xlsx / _traj.npy 为 v1 产物，重跑本脚本后刷新为 v2。
+本目录 result1.xlsx / _traj.npy 已由本脚本（v2）生成；配套脚本：p1_sensitivity.py（§10.1）、
+p1_greedy.py（§10.2）、p1_figs.py（§9.5 论文图）。
 """
 from pathlib import Path
 
@@ -177,14 +178,27 @@ if have_dual:
     print(f"Ψ̂ 范围 [{psi.min():.3f}, {psi.max():.3f}] 元/kWh；"
           f"充电功率顶格段 {int((b + c > PMAX - 1e-6).sum())} 个（其影子溢价 π>0）")
 
-    # 有限差分交叉验证（抽样内点节点）：f(P_i=+δ) 斜率应 ≈ -Ψ̂_i
+    # 有限差分交叉验证（抽样内点节点）：在节点 i 挂一个零成本、上限 δ 的"自由能量"变量，
+    # 目标函数斜率应 ≈ -γ_i（白得 1 kWh 的价值）。注意不能用"钉住 P_i=δ"——那是强迫多充，
+    # 含获取成本，不是白得能量。
+    def solve_with_free_energy(i, delta):
+        """追加变量 f∈[0,δ]（零成本），使 P_t += f 对所有 t≥i 成立"""
+        c2 = np.concatenate([c_obj, [0.0]])
+        col_eq = np.zeros(A_eq.shape[0])
+        col_eq[-1] = 1.0                                   # 全天归零行（=soc_row(T-1)）
+        Ae = np.column_stack([A_eq, col_eq]); be = b_eq.copy()
+        col_ub = np.zeros(A_ub.shape[0])
+        for t in range(i, T):                              # 前缀行 t≥i：偶=上界行，奇=下界行
+            col_ub[2 * t] += 1.0; col_ub[2 * t + 1] -= 1.0
+        Au = np.column_stack([A_ub, col_ub]); bu = b_ub.copy()
+        return linprog(c2, A_ub=Au, b_ub=bu, A_eq=Ae, b_eq=be,
+                       bounds=[(0, None)] * NV + [(0, delta)], method="highs")
+
     interior = [i for i in range(T) if EMIN + 10 < SOC[i + 1] < EMAX - 10]
     picks = [interior[j] for j in np.linspace(0, len(interior) - 1, 8).astype(int)]
     devs = []
     for i in picks:
-        _, Ae, be, Au, bu = build_lp(node_pin=(i, 5.0))
-        r2 = linprog(c_obj, A_ub=Au, b_ub=bu, A_eq=Ae, b_eq=be,
-                     bounds=[(0, None)] * NV, method="highs")
+        r2 = solve_with_free_energy(i, 5.0)
         if r2.success:
             devs.append(abs(psi[i] + (r2.fun - cost) / 5.0))
     print(f"[对偶符号有限差分验证] 抽样 {len(devs)} 个内点节点，最大偏差 {max(devs):.2e} 元/kWh")
