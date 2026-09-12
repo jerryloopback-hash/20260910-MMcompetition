@@ -34,3 +34,7 @@ C题/**/*.synctex.gz
 C题/**/*.fls
 C题/**/*.fdb_latexmk
 C题/**/*.missfont.log
+C题/p2_part2/p2b_figs.py
+C题/outcome/figs/fig6_p2_monthly.png
+C题/outcome/figs/fig5_p2_tau.png
+C题/outcome/figs/fig4_p2_groups.png
