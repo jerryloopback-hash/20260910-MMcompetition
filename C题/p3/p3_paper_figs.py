@@ -67,7 +67,7 @@ def fig_structure():
     for i, x0 in enumerate([6, 12, 18]):
         ax.text(x0 + 3, 0.45, f"成交＝第 {i+1} 次调整", ha="center", fontsize=9.5,
                 color="#333333")
-    ax.text(12, 4.35, "每个会话:更新全天预报 → 从实测 SOC 出发,对剩余全天重新优化",
+    ax.text(12, 4.35, "每个会话更新全天预报，从实测 SOC 出发重优化剩余全天",
             ha="center", fontsize=9.5, color="#555555")
 
     # 时间轴
@@ -100,10 +100,10 @@ def fig_structure():
     for i, x in enumerate(levels):
         axt.text(x, YMAX + 0.9, f"{counts[i]} 支", ha="center", fontsize=9.5,
                  color="#1f4e79")
-    axt.text(24.2, YMAX / 2, "情景\n(每支\n含完整\n日路径)", ha="left", va="center",
+    axt.text(24.2, YMAX / 2, "情景\n每支含\n完整日\n路径", ha="left", va="center",
              fontsize=8.5, color="#555555")
     axt.axis("off")
-    axt.text(12, -1.35, "每会话按修正量 $R_s$ 的 PCA 主子方向聚 3 支，逐层嵌套成 3×3×3 情景树；"
+    axt.text(12, -1.35, "每会话按修正量 $R_s$ 的 PCA 主子方向聚 3 支，逐层嵌套成 3×3×3 情景树，"
                         "叶内情景共享同一套决策",
              ha="center", fontsize=9.5, color="#555555")
 
@@ -126,7 +126,7 @@ def fig_session():
     axL.set_xticklabels(labs, fontsize=10)
     axL.set_ylabel("信息价值上限 / 万元", fontsize=10.5)
     axL.set_ylim(0, 47)
-    axL.set_title("若预报完美：各会话的信息价值上限", fontsize=11)
+    axL.set_title("若预报完美时的各会话信息价值上限", fontsize=11)
     axL.grid(axis="y", ls=":", alpha=0.45)
 
     x = np.arange(4)
@@ -138,7 +138,7 @@ def fig_session():
     axR.set_xticklabels(["0 次", "1 次", "2 次", "3 次"], fontsize=10)
     axR.set_ylabel("费用 / 万元", fontsize=10.5)
     axR.set_ylim(1120, 1230)
-    axR.set_title("实际：启用 $k$ 次调整的费用与边际价值", fontsize=11)
+    axR.set_title("启用 $k$ 次调整的费用与边际价值", fontsize=11)
 
     axR2 = axR.twinx()
     axR2.plot(np.arange(1, 4), FAM_MARG, "o-", color="#c0392b", lw=1.8, ms=6)
@@ -149,7 +149,7 @@ def fig_session():
     axR2.tick_params(axis="y", colors="#c0392b")
     axR.grid(axis="y", ls=":", alpha=0.35)
 
-    fig.suptitle("每一次预报值多少(306 天，3.1–12.31)", fontsize=12, y=1.02)
+    fig.suptitle("各会话预报的价值，306 天窗口", fontsize=12, y=1.02)
     fig.tight_layout()
     fig.savefig(OUT / "fig_p3_session.png", dpi=170, bbox_inches="tight")
     plt.close(fig)

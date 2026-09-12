@@ -115,22 +115,26 @@ def figs(R):
         t = pd.read_excel(wf)
         t = t.dropna(subset=["306天"])
         fig, ax = plt.subplots(figsize=(7.6, 4.6))
-        vals = t["306天"].values; labs = t["层级"].values
+        vals = t["306天"].values
+        LBL = {"本节+原始预报(无矫正融合)": "四阶段模型＋原始预报",
+               "本节四阶段随机规划(矫正＋融合)": "四阶段随机规划，矫正＋融合"}
+        labs = [LBL.get(x, x) for x in t["层级"].values]
         ax.bar(range(len(vals)), vals, color=["#e08a5b", "#4b8fd0", "#5aa469"])
         for i, v in enumerate(vals):
             ax.text(i, v + 8, f"{v:.1f}", ha="center", fontsize=10)
         for i in range(len(vals) - 1):
             d = vals[i] - vals[i + 1]
+            dd = round(d + 1e-9, 1)
             ax.annotate("", xy=(i + 1, vals[i + 1]), xytext=(i, vals[i]),
                         arrowprops=dict(arrowstyle="->", color="#c0392b", lw=1.6))
-            ax.text(i + 0.5, (vals[i] + vals[i + 1]) / 2 + 20, f"−{d:.1f}", color="#c0392b",
+            ax.text(i + 0.5, (vals[i] + vals[i + 1]) / 2 + 20, f"−{dd:.1f}", color="#c0392b",
                     ha="center", fontsize=10)
         ax.axhline(1638.75, color="#7b241c", ls="--", lw=1.3)
-        ax.text(len(vals) - 1, 1638.75 + 12, "问题二日前计划 1638.75(334 天口径, 参照)",
+        ax.text(len(vals) - 1, 1638.75 + 12, "问题二日前计划 1638.75，334 天口径，仅作参照",
                 color="#7b241c", ha="right", fontsize=8.5)
         ax.set_xticks(range(len(labs))); ax.set_xticklabels(labs, fontsize=8.5)
         ax.set_ylim(0, 1750)
-        ax.set_ylabel("费用(万元)"); ax.set_title("价值瀑布(306 天 3.1–12.31, 实测路径结算)")
+        ax.set_ylabel("费用/万元"); ax.set_title("价值瀑布，306 天实测路径结算")
         fig.tight_layout(); fig.savefig(OUT / "fig1_瀑布.png", dpi=160); plt.close(fig)
 
     # 图2: 会话信息价值(完美预见)
@@ -140,8 +144,8 @@ def figs(R):
     ax.bar(ks, vs, color="#4b8fd0")
     for i, v in enumerate(vs):
         ax.text(i, v + 0.4, f"{v:.1f}", ha="center", fontsize=10)
-    ax.set_ylabel("信息价值上限(万元)")
-    ax.set_title("各会话完美预报的信息价值上限(306 天)")
+    ax.set_ylabel("信息价值上限/万元")
+    ax.set_title("各会话完美预报的信息价值上限，306 天")
     fig.tight_layout(); fig.savefig(OUT / "fig2_会话信息价值.png", dpi=160); plt.close(fig)
 
     # 图3: 会话启用族
@@ -155,8 +159,8 @@ def figs(R):
     ax2.plot([0.5, 1.5, 2.5], marg, "o-", color="#c0392b")
     for i, m in enumerate(marg):
         ax2.text(i + 0.5, m + 1, f"{m:.1f}", color="#c0392b", ha="center", fontsize=9)
-    ax2.set_ylabel("边际价值(万元)", color="#c0392b")
-    ax.set_ylabel("费用(万元)"); ax.set_title("会话启用族与边际信息价值(306 天)")
+    ax2.set_ylabel("边际价值/万元", color="#c0392b")
+    ax.set_ylabel("费用/万元"); ax.set_title("会话启用族与边际信息价值，306 天")
     fig.tight_layout(); fig.savefig(OUT / "fig3_会话启用族.png", dpi=160); plt.close(fig)
 
     # 图4: 风险画像
@@ -165,8 +169,8 @@ def figs(R):
     for q, lab, c in zip(R["qs"], ["P50", "P90", "P95"], ["#2c7fb8", "#e08a5b", "#c0392b"]):
         ax.axvline(q, color=c, ls="--", lw=1.4, label=f"{lab}={q:.1f}")
     ax.axvline(R["cvar95"], color="#7b241c", ls=":", lw=2.0, label=f"CVaR95={R['cvar95']:.1f}")
-    ax.set_xlabel("单日净费用(万元)"); ax.set_ylabel("情景数")
-    ax.set_title("主模型费用分布与风险画像(306 天 × 28 情景)")
+    ax.set_xlabel("单日净费用/万元"); ax.set_ylabel("情景数")
+    ax.set_title("主模型费用分布与风险画像，306 天共 28 情景")
     ax.legend(fontsize=9)
     fig.tight_layout(); fig.savefig(OUT / "fig4_风险画像.png", dpi=160); plt.close(fig)
     print(f"  图已保存 -> {OUT}/fig1..4.png")
