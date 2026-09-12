@@ -6,6 +6,7 @@
 \usepackage{setspace}
 \usepackage{indentfirst}
 \usepackage[font=small]{caption}
+\usepackage{afterpage}
 \graphicspath{{figs/}}
 
 % 中文字体（宋体正文，黑体加粗；西文 Times New Roman）
@@ -21,6 +22,15 @@
   subsection={beforeskip=0.6em,afterskip=0.4em}
 }
 \allowdisplaybreaks
+
+% 浮动体参数：优先图文混排，避免半空浮页
+\renewcommand{\topfraction}{0.9}
+\renewcommand{\bottomfraction}{0.7}
+\renewcommand{\textfraction}{0.05}
+\renewcommand{\floatpagefraction}{0.8}
+\setcounter{totalnumber}{6}
+\setcounter{topnumber}{3}
+\setcounter{bottomnumber}{3}
 
 \begin{document}
 
@@ -123,66 +133,47 @@
 
 \begin{enumerate}
 \item 储能设备按照充、放电效率各取 $90\%$，往返效率 $81\%$的思路理解。
-\item 功率上限按照 5000~kW 指储能设备并网侧而非电池侧理解，即考虑为其充、放电功率在发生电能损失之前的最大功率。这是行业内的常见理解，
-\item 但会使得我们的最低成本较电池侧的理解的稍大。
+\item 功率上限按照 5000~kW 指储能设备并网侧而非电池侧理解，即考虑为其充、放电功率在发生电能损失之前的最大功率。这是行业内的常见理解，但会使得我们的最低成本较电池侧的理解的稍大。
 \item 购电量与放电量均非负，不向外网反送电；光伏盈余只能充电或弃掉，弃光不计费用，以与题面"购电量"的记账方向一致。
 \end{enumerate}
 
 % ===================== 4 符号说明 =====================
 \section{符号说明}
 
-{\small
-\begin{center}
-\begin{tabular}{ll}
+\afterpage{
+{\footnotesize\renewcommand{\arraystretch}{0.95}
+\begin{table}[t]\centering
+\begin{tabular}{@{}p{2.6cm}p{4.4cm}@{\hspace{1.5em}}p{2.6cm}p{4.4cm}@{}}
 \toprule
-符号 & 说明 \\
+符号 & 说明 & 符号 & 说明 \\
 \midrule
-$\Delta t$ & 单时段长度，10 min \\
-$\lambda_t$ & 时段 $t$ 的外网电价，元/kWh \\
-$L_t$ & 时段 $t$ 的小区负载，kW \\
-$P_t^{\mathrm{pv}}$ & 时段 $t$ 的光伏发电预测功率，kW \\
-$a_t,\ b_t$ & 时段 $t$ 购电功率中直供部分 / 充电部分，kW \\
-$g_t,\ c_t$ & 时段 $t$ 光伏功率中直供部分 / 充电部分，kW \\
-$q_t$ & 时段 $t$ 光伏弃光功率，kW \\
-$d_t$ & 时段 $t$ 储能放电功率，kW \\
-$E_t$ & 时段 $t$ 末储电量，kWh \\
-$S_t$ & 时段 $t$ 末的净充电累计量，$E_t=6000+S_t$，kWh \\
-$\eta$ & 充放电效率，取 0.9 \\
-$E_0,\ E_{\min},\ E_{\max}$ & 储电量初值与界限：6000、1200、10800 kWh \\
-$P_{\max}$ & 并网侧充放电功率上限，5000 kW \\
-$\gamma_t,\ \sigma_t$ & 节点边际价值 / 边际供电成本，元/kWh \\
-\midrule
-$\hat L_t,\ \hat P_t$ & 问题~2 中时段 $t$ 经选定分位档修正的负载 / 光伏预测，kW \\
-$P_t$ & 问题~2 结算用的光伏实际功率，kW \\
-$g_t^{r}$ & 问题~2 结算期实际光伏直供功率，$\min(g_t,\,P_t)$，kW \\
-$R_t$ & 问题~2 时段 $t$ 实际总供给，$a_t+g_t^{r}+d_t$，kW \\
-$e_t$ & 问题~2 时段 $t$ 供电缺口，kW \\
-$C_t^{\mathrm{e}}$ & 问题~2 时段 $t$ 紧急购电费，元 \\
-$E_0^{(d)}$ & 第 $d$ 日 0:00 储电量，滚动取前一日执行期末值，kWh \\
-$F^{(d)}$ & 第 $d$ 日计划购电费，元 \\
-$w_{t,i}$ & 第 $t$ 日模型 $i$ 的 EGD 集成权重 \\
-$\tilde\ell_{t,i}$ & 模型 $i$ 第 $t$ 日的局部核加权损失 \\
-$\mu$ & EGD 权重更新学习率，取 0.005 \\
-$\alpha$ & 权重重初始化的混合系数 \\
-$\tau$ & 决策分位，负载取 $P_{\tau}$、光伏取 $P_{1-\tau}$ \\
-$C_u,\ C_o$ & 购电低估 / 高估的单位成本，$5\lambda_t$ / $\lambda_t$ \\
-\midrule
-$p_t$ & 问题~3 中时段 $t$ 的 0:00 计划购电量，kWh \\
-$u_t$ & 问题~3 中时段 $t$ 的最终成交购电量，kWh \\
-$\mathrm{gap}_t$ & 问题~3 中时段 $t$ 的缺口电量，kWh \\
-$A$ & 问题~3 中光伏逐时真值，kW \\
-$C_s$ & 问题~3 中会话 $s$ 的采用预测中心，kW \\
-$\varepsilon_0$ & 问题~3 中 0:00 采用中心相对真值的整日偏差，kW \\
-$G_s$ & 问题~3 中会话 $s$ 相对上一会话的全天修正量，kW \\
-$Q_t^n,\ D_t^n$ & 问题~3 中节点 $n$ 在时段 $t$ 的购电量 / 放电量，kWh \\
-$\mathrm{RP},\ \mathrm{WS},\ \mathrm{EEV}$ & 问题~3 随机规划 / 完美信息 / 确定性计划下的总费用，万元 \\
-$\mathrm{EVPI},\ \mathrm{VSS}$ & 完美信息价值 / 随机优化的价值，万元 \\
+$\Delta t$ & 单时段 10 min & $R_t$ & 实际总供给 \\
+$I_k$ & 第 $k$ 个时段 & $e_t$ & 供电缺口 \\
+$\lambda_t$ & 外网电价 & $C_t^{\mathrm{e}}$ & 紧急购电费 \\
+$L_t$ & 小区负载 & $E_0^{(d)},\ E_{144}^{(d)}$ & 日初/末储电量 \\
+$P_t^{\mathrm{pv}}$ & 光伏预测功率 & $d$ & 日序号 \\
+$a_t,\ b_t$ & 购电：直供/充电 & $F^{(d)}$ & 日计划购电费 \\
+$g_t,\ c_t$ & 光伏：直供/充电 & $w_{t,i}$ & EGD 集成权重 \\
+$q_t$ & 弃光功率 & $\ell_{s,i},\ \tilde\ell_{t,i}$ & 单日损失/核加权 \\
+$d_t$ & 储能放电功率 & $\mu$ & EGD 学习率 \\
+$E_t$ & 时段末储电量 & $\alpha$ & 权重重初始化系数 \\
+$S_t$ & 净充电累计量 & $N,\ T$ & 成员数与评估天数 \\
+$\eta$ & 充放电效率 & $\tau$ & 决策分位 \\
+$E_0,\ E_{\min},\ E_{\max}$ & 储电量初值与上下限 & $C_u,\ C_o$ & 低估/高估单位成本 \\
+$P_{\max}$ & 并网侧功率上限 & $p_t$ & 0:00 计划购电量 \\
+$\gamma_t,\ \sigma_t$ & 节点价值/供电成本 & $u_t$ & 最终成交购电量 \\
+$\eta_t,\ \theta_t$ & 储电量界限对偶变量 & $\kappa_t$ & 时段总费用 \\
+$F$ & 全天购电费 & $A$ & 光伏逐时真值 \\
+$\hat L_t,\ \hat P_t$ & 分位修正负载/光伏预测 & $C_s$ & 会话预测中心 \\
+$y_t,\ \hat y_t$ & 实际值与预测值 & $\varepsilon_0$ & 0:00 中心整日偏差 \\
+$Q_q$ & 残差经验分位数 & $G_s$ & 会话间修正量 \\
+$P_t$ & 光伏实际功率 & $\omega$ & 情景（历史日）标号 \\
+$g_t^{r}$ & 实际光伏直供 & $Q_t^n,\ D_t^n$ & 节点购电/放电量 \\
 \bottomrule
 \end{tabular}
-\end{center}
-}
+\end{table}
+}}
 
-\newpage
 % ===================== 5 问题1 =====================
 \section{问题1模型的建立与求解}
 
@@ -201,7 +192,7 @@ $\mathrm{EVPI},\ \mathrm{VSS}$ & 完美信息价值 / 随机优化的价值，�
 
 首先可对附件~1 中的数据做简要预分析。
 
-本题把每日划成 144 个时段 $I_k=[10(k-1),\,10k)$ min，$k=1,\dots,144$。$I_1$ 取附件的第 144 行，该行标记的是次日 0:00 起的 10 分钟，由假设~1 的周期性，其数值与当日 0:00 至 0:10 相同；$I_2$ 至 $I_{144}$ 依次取当天的第 1 至第 143 行。可以简要分析出，电价在深夜与午间各有一个低谷，早 8 时前后与 19 时至 22 时各有一个高峰，双谷双峰的形态给储能低充高放留出了空间。
+本题把每日划成 144 个时段 $I_k=[10(k-1),\,10k)$ min，$k=1,\dots,144$。$I_1$ 取附件的第 144 行，该行标记的是次日 0:00 起的 10 分钟，由数据的日周期性，其数值与当日 0:00 至 0:10 相同；$I_2$ 至 $I_{144}$ 依次取当天的第 1 至第 143 行。可以简要分析出，电价在深夜与午间各有一个低谷，早 8 时前后与 19 时至 22 时各有一个高峰，双谷双峰的形态给储能低充高放留出了空间。
 
 在本问的微网为小区负载的场景下，构建每个时刻的电能流是理解各购电、充放电和供电的关键所在：
 
@@ -351,7 +342,7 @@ S_t=\sum_{s\le t}\Bigl[\,0.9\,(b_s+c_s)-d_s/0.9\,\Bigr]\Delta t ,
 
 \begin{figure}[htbp]
 \centering
-\includegraphics[width=0.92\textwidth]{fig2_dispatch.png}
+\includegraphics[width=0.85\textwidth]{fig2_dispatch.png}
 \caption{解的储能状态与各时段购电、充电及放电功率}
 \label{fig:dispatch}
 \end{figure}
@@ -421,7 +412,7 @@ $\eta$ & 阈值 $1/\eta^2$ & 购电费/元 & 较 $\eta=0.90$ \\
 
 \textbf{功率上限 $P_{\max}$} \ \  分析可得，解中有 19 个时段的充电功率顶在 5000~kW，该约束频繁激活，值得单独查验。
 把 $P_{\max}$ 放宽到 6000~kW 重解，成本仅降 0.12\%。其看可能的原因是低价时段的总电量足以把储能设备充满，上限改变的只是充电在时段之间的分布，
-而不是充入的总量；放电峰值功率 4294~kW 从未触顶，两个方向中只有充电侧受到约束。而假设~3 中我们对于$P_{\max}$的并网侧理解与“电池侧”，认为时电池实际存入或输出的功率可达 $P_{\max}$，对结果的影响同样被限制在这一量级。
+而不是充入的总量；放电峰值功率 4294~kW 从未触顶，两个方向中只有充电侧受到约束。而假设~2 中我们对于$P_{\max}$的并网侧理解与“电池侧”，认为时电池实际存入或输出的功率可达 $P_{\max}$，对结果的影响同样被限制在这一量级。
 
 % ===================== 6 问题2 =====================
 \section{问题2模型的建立与求解}
@@ -554,10 +545,10 @@ w_{t+1,i}=\frac{w_{t,i}\,\exp(-\mu\,\tilde\ell_{t,i})}{\sum_j w_{t,j}\,\exp(-\mu
 若某个成员模型在夏季被压到很低的份额，此后即便秋天的数据重新对它有利，指数更新也较缓慢的只能把它往回拉，这不能满足一些情况下的快速响应需求。
 为此，我们每隔 7 天将模型重训：
 \begin{equation}
-w_t\leftarrow \alpha\,w_{\mathrm{init}}+(1-\alpha)\,w_t,\qquad \alpha=\max\Bigl(0.05,\ 0.5\,\exp\bigl(-(N-35)/60\bigr)\Bigr),
+w_t\leftarrow \alpha\,w_{\mathrm{init}}+(1-\alpha)\,w_t,\qquad \alpha=\max\Bigl(0.05,\ 0.5\,\exp\bigl(-(d-35)/60\bigr)\Bigr),
 \label{eq:reinit}
 \end{equation}
-其中， $N$ 为已训练天数。在最初的冷启动阶段，由于数据太少$N<35$ ， $\alpha$ 偏大
+其中， $d$ 为已训练天数。在最初的冷启动阶段，由于数据太少$d<35$ ， $\alpha$ 偏大
 权重被拉回一个偏向简单方法的起点；而随着数据量的增加啊，后续的 $\alpha$ 衰减到 0.05 的下限，
 只保留一点微弱的复位，不再打扰已经学稳的权重。即长线的在线更新负责跟踪学习，周期性的复位负责切换\cite{zhang2023onenet}
 
@@ -656,7 +647,7 @@ EGD 集成 & 162.99 & EGD 集成 & 165.96 \\
 
 \begin{figure}[htbp]
 \centering
-\includegraphics[width=0.9\textwidth]{fig_p2f_period.png}
+\includegraphics[width=0.8\textwidth]{fig_p2f_period.png}
 \caption{两个时段上本文集成与对照方法的 MAE 对照（左：负载，右：光伏）}
 \label{fig:p2fperiod}
 \end{figure}
@@ -671,14 +662,14 @@ EGD 集成 & 162.99 & EGD 集成 & 165.96 \\
 
 \begin{figure}[htbp]
 \centering
-\includegraphics[width=0.88\textwidth]{fig_p2f_oracle.png}
+\includegraphics[width=0.78\textwidth]{fig_p2f_oracle.png}
 \caption{泄漏核验：逐日事后最优成员构成信息上界，本文集成距上界尚有 17\%--18\% 的差距（左：负载，右：光伏）}
 \label{fig:p2foracle}
 \end{figure}
 
 \begin{figure}[htbp]
 \centering
-\includegraphics[width=0.95\textwidth]{fig_p2f_sens.png}
+\includegraphics[width=0.8\textwidth]{fig_p2f_sens.png}
 \caption{设计层敏感性：关键常数逐项拧偏一档后，样本外（5--12 月）MAE 相对基准的变化全部在 $\pm2\%$ 内（左：负载，右：光伏）}
 \label{fig:p2fsens}
 \end{figure}
@@ -712,12 +703,12 @@ q^{\mathrm{ref}}=\frac{C_u}{C_u+C_o}=\frac{5\lambda_t}{5\lambda_t+\lambda_t}=\fr
 
 计划在每日 0:00 锁定，日内不再根据实际负荷和光伏调整。当计划供给不足时，紧急购电承担供电平衡的硬约束。记实际光伏功率为 $P_t$，计划光伏直供为 $g_t$，实际供给量为
 \begin{equation}
-S_t=a_t+g_t^{r}+d_t ,\qquad g_t^{r}=\min(g_t,\,P_t) ,
+R_t=a_t+g_t^{r}+d_t ,\qquad g_t^{r}=\min(g_t,\,P_t) ,
 \label{eq:supply}
 \end{equation}
 其中 $P_t$ 为该时段光伏实际功率，$g_t^{r}$ 表示实际光伏先满足计划直供，不足部分即是缺口的来源之一。缺口与紧急购电费为
 \begin{equation}
-e_t=\max\bigl(0,\;L_t-S_t\bigr),\qquad C_t^{\mathrm{e}}=5\lambda_t\,e_t\,\Delta t ,
+e_t=\max\bigl(0,\;L_t-R_t\bigr),\qquad C_t^{\mathrm{e}}=5\lambda_t\,e_t\,\Delta t ,
 \label{eq:gap}
 \end{equation}
 连续缺口时段合并为同一区间记账。此外，实际光伏超出计划直供的部分并入充电，受功率与容量上限截断，装不下的部分弃掉。全年能源支出为计划购电费与紧急购电费之和，净成本再减去期末储能价值。
@@ -768,7 +759,7 @@ LSTM 组 & 1633.96 & 2829.85 & 3,661,104 \\
 
 \begin{figure}[htbp]
 \centering
-\includegraphics[width=0.95\textwidth]{fig6_p2_monthly.png}
+\includegraphics[width=0.8\textwidth]{fig6_p2_monthly.png}
 \caption{三组预测来源的月度紧急购电费用对比}
 \label{fig:p2monthly}
 \end{figure}
@@ -783,7 +774,7 @@ LSTM 组 & 1633.96 & 2829.85 & 3,661,104 \\
 
 费用如何计算需要先行确定。记时段 $t$ 的 0:00 计划购电量为 $p_t$，该时段最终成交量为 $u_t$。题面给出的两侧罚率并不对称，成交低于计划的部分按 $0.5\lambda_t$ 计违约价，高于计划的部分按 $1.5\lambda_t$ 计超购价。若把计划量 $p_t$ 也按 $\lambda_t$ 全额计入，则成交从计划往下减 1~kWh 只省下 $0.5\lambda_t$，向下调整几乎无利可图，题面写出的 $0.5$ 倍违约价便失去作用。我们按偏差电量考核的通行算法，记每时段的费用
 \begin{equation}
-c_t=\lambda_t u_t+0.5\lambda_t\,|u_t-p_t|+5\lambda_t\,\mathrm{gap}_t ,
+\kappa_t=\lambda_t u_t+0.5\lambda_t\,|u_t-p_t|+5\lambda_t\,\mathrm{gap}_t ,
 \label{eq:p3cost}
 \end{equation}
 即成交电量按原价结算，偏离计划的部分不分方向按 $0.5\lambda_t$ 计罚，缺口仍由 $5\lambda_t$ 的紧急购电兜底。成交不低于计划时，这一式与题面完全重合，此时式~\eqref{eq:p3cost} 等于 $\lambda_t p_t+1.5\lambda_t(u_t-p_t)$，正是超出部分按 $1.5$ 倍计价的写法；只在成交低于计划时，它才给出向下调整的空间。全天总费用为式~\eqref{eq:p3cost} 在 144 段上的求和，与题面的计划购电费用、紧急购电费用和调整购电量相关费用三项一一对应。
@@ -840,7 +831,7 @@ c_t=\lambda_t u_t+0.5\lambda_t\,|u_t-p_t|+5\lambda_t\,\mathrm{gap}_t ,
 
 \begin{figure}[htbp]
 \centering
-\includegraphics[width=0.98\textwidth]{p3_structure.png}
+\includegraphics[width=0.88\textwidth]{p3_structure.png}
 \caption{四个会话的信息结构与 $3\times3\times3$ 情景树}
 \label{fig:p3struct}
 \end{figure}
@@ -946,8 +937,7 @@ c_t=\lambda_t u_t+0.5\lambda_t\,|u_t-p_t|+5\lambda_t\,\mathrm{gap}_t ,
 \begin{tabular}{llllllll}
 \toprule
 \multicolumn{2}{c}{3 月 20 日} & \multicolumn{2}{c}{6 月 21 日}
-& \multicolumn{2}{c}{9 月 23 日} & \multicolumn{2}{c}{12 月 21 日} \\
-\cmidrule(lr){1-2}\cmidrule(lr){3-4}\cmidrule(lr){5-6}\cmidrule(lr){7-8}
+& \multicolumn{2}{c}{9 月 23 日} & \multicolumn{2}{c}{12 月 21 日} \\\cmidrule(lr){3-4}\cmidrule(lr){5-6}\cmidrule(lr){7-8}
 时间段 & 购电量 & 时间段 & 购电量 & 时间段 & 购电量 & 时间段 & 购电量 \\
 \midrule
 3:10-3:30 & 9.89 & 3:10-3:20 & 10.10 & 5:00-5:10 & 10.70 & 3:30-3:50 & 68.73 \\
@@ -972,7 +962,7 @@ c_t=\lambda_t u_t+0.5\lambda_t\,|u_t-p_t|+5\lambda_t\,\mathrm{gap}_t ,
 
 \begin{figure}[htbp]
 \centering
-\includegraphics[width=0.95\textwidth]{p3_waterfall.png}
+\includegraphics[width=0.82\textwidth]{p3_waterfall.png}
 \caption{问题~3 的价值瀑布，306 天实测路径结算}
 \label{fig:p3wf}
 \end{figure}
@@ -981,7 +971,7 @@ c_t=\lambda_t u_t+0.5\lambda_t\,|u_t-p_t|+5\lambda_t\,\mathrm{gap}_t ,
 
 \begin{figure}[htbp]
 \centering
-\includegraphics[width=0.98\textwidth]{p3_session.png}
+\includegraphics[width=0.9\textwidth]{p3_session.png}
 \caption{各会话预报的信息价值与启用 $k$ 次调整的费用，306 天。左为完美预报的信息价值上限，右为启用 $k$ 次调整的费用与边际价值}
 \label{fig:p3ses}
 \end{figure}

@@ -2,9 +2,7 @@
 """P2 论文图表: 组间对比 / 决策τ曲线 / 月度分解 -> outcome/figs/"""
 import pandas as pd, numpy as np
 import matplotlib
-matplotlib.use("Agg")
 import matplotlib.pyplot as plt
-
 plt.rcParams["font.sans-serif"] = ["SimHei", "Microsoft YaHei"]
 plt.rcParams["axes.unicode_minus"] = False
 
@@ -13,13 +11,12 @@ FIGS = r"..\outcome\figs"
 df = pd.read_excel(XL, sheet_name="组间对比")
 pf = float(df[df["组"] == "完美预见下界"]["total"].iloc[0])
 W = 1e4  # 万元
-
 # ---- 图A: 三组模型来源对比(柱状) ----
 groups = ["模型池组", "XGBoost对照组", "LSTM组"]
 vals = [float(df[df["组"] == g]["total"].iloc[0]) / W for g in groups]
 fig, ax = plt.subplots(figsize=(7.2, 4.2))
 bars = ax.bar(range(len(groups)), vals, width=0.5,
-              color=["#2b6cb0", "#718096", "#e53e3e"])
+               color=["#2b6cb0", "#718096", "#e53e3e"])
 for i, v in enumerate(vals):
     ax.text(i, v + 30, f"{v:,.0f}", ha="center", fontsize=10)
 ax.set_xticks(range(len(groups))); ax.set_xticklabels(groups)
@@ -27,7 +24,6 @@ ax.set_ylabel("全年总费用 / 万元")
 ax.set_title("三组预测来源的同管线全年总费用对比")
 ax.set_ylim(0, max(vals) * 1.15)
 fig.tight_layout(); fig.savefig(FIGS + r"\fig4_p2_groups.png", dpi=200); plt.close(fig)
-
 # ---- 图B: 决策分位 τ 曲线(备用, 当前论文未引用) ----
 qrows = df[df["组"].str.startswith("分位τ")].copy()
 qrows["tau"] = qrows["组"].str.extract(r"τ=([0-9.]+)").astype(float)
@@ -45,7 +41,6 @@ ax.set_ylabel("全年总费用 / 万元")
 ax.set_title("决策分位 τ 的全年总费用曲线(U 形)")
 ax.legend(fontsize=9)
 fig.tight_layout(); fig.savefig(FIGS + r"\fig5_p2_tau.png", dpi=200); plt.close(fig)
-
 # ---- 图C: 月度紧急费用(三组) ----
 months = list(range(2, 13))
 def monthly_emerg(sheet):
@@ -56,15 +51,14 @@ e_xgb = monthly_emerg("月度_XGBoost对照组")
 e_lstm = monthly_emerg("月度_LSTM组")
 x = np.arange(len(months))
 fig, ax = plt.subplots(figsize=(7.6, 4.2))
-ax.bar(x - 0.22, e_ens, width=0.22, label="模型池组", color="#2b6cb0")
-ax.bar(x,        e_xgb, width=0.22, label="XGBoost对照组", color="#a0aec0")
-ax.bar(x + 0.22, e_lstm, width=0.22, label="LSTM组", color="#e53e3e")
+ax.bar(x - 0.45, e_ens, width=0.22, label="模型池组", color="#2b6cb0")
+ax.bar(x - 0.10, e_xgb, width=0.22, label="XGBoost对照组", color="#a0aec0")
+ax.bar(x + 0.30, e_lstm, width=0.22, label="LSTM组", color="#e53e3e")
 ax.set_xticks(x); ax.set_xticklabels([f"{m}月" for m in months])
 ax.set_ylabel("月度紧急购电费 / 万元")
 ax.set_title("三组预测来源的月度紧急购电费用对比")
 ax.legend(fontsize=9)
 fig.tight_layout(); fig.savefig(FIGS + r"\fig6_p2_monthly.png", dpi=200); plt.close(fig)
-
 # ---- 论文用月度数字 ----
 mens = pd.read_excel(XL, sheet_name="月度_模型池组").set_index("月份")
 mxgb = pd.read_excel(XL, sheet_name="月度_XGBoost对照组").set_index("月份")
