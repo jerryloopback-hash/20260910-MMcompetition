@@ -172,7 +172,10 @@ print("\n===== M2 部署帧: Frame D(绑定段全天) =====")
 print(pd.DataFrame(tabD).to_string(index=False))
 print(f"\n滚动权重年均值(0:00→18:00): {[round(float(w_att[:, s].mean()), 3) for s in range(NS)]}")
 
-# ---------- 6. 十分钟中心下沉(EGD 形状, 保能量) ----------
+# ---------- 6. 十分钟中心下沉(EGD 形状, 守小时均值) ----------
+# 口径: 整点中心 C 是"该小时的平均功率(kW)", 故小时内形状必须**均值=1**(6 段和=6),
+# 使 mean_j C_slot(j) = C_hour。v1 误用"和为 1"(形状=段值/小时和), 结果每段只有 1/6,
+# 使十分钟中心整体缩小 6 倍 —— M5 消费时才暴露(M5 起才乘 Δt 变电量)。
 CS = np.full((NS, NEVAL, 144), np.nan)
 for s in range(NS):
     for h in range(int(H0[s]), NL):
@@ -180,9 +183,9 @@ for s in range(NS):
         egsl = egdp[:NEVAL, sl]
         egs = egsl.sum(axis=1)
         ok = egs > 1e-9
-        shape = np.where(ok[:, None], egsl / np.where(ok, egs, 1.0)[:, None], 1.0 / 6)  # 和为1
+        shape = np.where(ok[:, None], egsl * 6.0 / np.where(ok, egs, 1.0)[:, None], 1.0)  # 均值=1
         CS[s][:, sl] = C[:, s, h][:, None] * shape
-        assert np.allclose(CS[s][:, sl].sum(axis=1)[ok], C[ok, s, h], rtol=1e-8), "下沉不保能量"
+        assert np.allclose(CS[s][:, sl].mean(axis=1)[ok], C[ok, s, h], rtol=1e-8), "下沉未守小时均值"
 
 # ---------- 7. 落盘 ----------
 if not SMOKE:

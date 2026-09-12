@@ -157,7 +157,8 @@ for e in range(334):
 print(f"===== 形态曲线库 {shape.shape} (尾随{W_SHAPE}天, 实际小时均值<20kW 取平1) =====")
 
 # ---------- 5b. 中心的十分钟下沉(对 C_adj 重算; M2 的 C_slot.npy 基于校正前中心, 已过期) ----------
-# 公式同 M2 §5: 十分钟中心 = 融合整点水平 × EGD 小时内形状(和为1), 保能量。
+# 口径同 M2 §5(已修): 形状**均值=1**(6 段和=6), 使 mean_j 中心(j) = 整点中心;
+# v1 误用"和为 1", 十分钟中心整体缩小 6 倍 —— M5 乘 Δt 变电量时才暴露。
 C_slot_adj = np.full((NS, 334, 144), np.nan, dtype=np.float32)
 for s in range(NS):
     for h in range(int(H0[s]), NL):
@@ -165,10 +166,10 @@ for s in range(NS):
         egsl = egdp[:334, sl]
         egs = egsl.sum(axis=1)
         ok = egs > 1e-9
-        shp = np.where(ok[:, None], egsl / np.where(ok, egs, 1.0)[:, None], 1.0 / 6)
+        shp = np.where(ok[:, None], egsl * 6.0 / np.where(ok, egs, 1.0)[:, None], 1.0)
         C_slot_adj[s][:, sl] = C_adj[:, s, h][:, None] * shp
-        assert np.allclose(C_slot_adj[s][:, sl].sum(axis=1)[ok], C_adj[ok, s, h], rtol=1e-6)
-print(f"===== 十分钟中心(校正后) {C_slot_adj.shape} 保能量; 取代 M2 的 C_slot.npy 供 M5 =====")
+        assert np.allclose(C_slot_adj[s][:, sl].mean(axis=1)[ok], C_adj[ok, s, h], rtol=1e-6)
+print(f"===== 十分钟中心(校正后) {C_slot_adj.shape} 守小时均值; 取代 M2 的 C_slot.npy 供 M5 =====")
 
 # ---------- 6. 协方差健康(活子空间)与 PCA 预览 ----------
 blocks = {"eps0(24)": donor_pv[:, :24], "G1(18)": donor_pv[:, 24:42],
