@@ -76,39 +76,59 @@ I0 = 31                                                     # 2025-02-01 在附�
 
 
 # ============================================================
-#  LP 组装
+#  LP 组装(可退化: 会话数 n_sessions / 完美预见 perfect / 冻结 fix)
 # ============================================================
-def build_lp(scen, tree, soc0, lam):
-    """返回 (c, A_ub, b_ub, A_eq, b_eq, bounds, index)。scen/tree 见 m4_tree。"""
+def _blocks(n_sessions):
+    """各阶段 slot 块。阶段1 = 计划块; 阶段2..n+1 = 调整块。
+    n=0 → 计划覆盖全天(无调整); n>=1 → 首块 (0,36), 之后每块 36 段, 末块延到 144。
+    例: n=1→[(0,36),(36,144)]; n=2→[…,(36,72),(72,144)]; n=3→[…,(36,72),(72,108),(108,144)]"""
+    if n_sessions == 0:
+        return [(0, 144)]
+    edges = [0, 36] + [36 + 36 * s for s in range(1, n_sessions)] + [144]
+    return [(edges[i], edges[i + 1]) for i in range(len(edges) - 1)]
+
+
+def build_lp(scen, tree, soc0, lam, n_sessions=NSTAGE - 1, perfect=(), fix=None):
+    """扩展型多阶段 LP。默认 (n_sessions=3, perfect=(), fix=None) 即 M5 主模型(M6 依赖此不变性)。
+    n_sessions : 启用的调整会话数 0..3 (0 = 只 0:00 计划, 无调整)                  —— M8 会话族
+    perfect    : 完美预见的阶段号集合(2..n_sessions+1)——该阶段按逐场景决策        —— WS 型臂
+    fix        : {'P':(144,), 'D1':(blk0,)} 冻结首阶段为该计划(标准 EEV)"""
     K = scen["K"]
     pv = scen["PV_slot"] * DT                               # (K,144) kWh
     ld = scen["L_slot"] * DT
+    blk = _blocks(n_sessions)
+    nstage = n_sessions + 1
     nodes = tree["nodes"]                                   # nodes[lev], lev=0→阶段2
-    # 各阶段节点集合
-    stage_nodes = {1: [0], 2: list(range(len(nodes[0]))),
-                   3: list(range(len(nodes[1]))), 4: list(range(len(nodes[2])))}
-    stage_nodes[1] = [("root", 0)]
-    # 把 (阶段, 节点) 编成 0/1/2/3 的局部号 → 供情景查表
-    node_of = np.zeros((NSTAGE + 1, K), dtype=int)           # node_of[s][ω]
-    for lev in range(3):
-        for n, nd in enumerate(nodes[lev]):
-            node_of[lev + 2, nd["members"]] = n
-    # 成员数
-    size2 = [n["n"] for n in nodes[0]]
-    size3 = [n["n"] for n in nodes[1]]
-    size4 = [n["n"] for n in nodes[2]]
-    sizes = {2: size2, 3: size3, 4: size4}
+    perfect = set(int(x) for x in perfect)
+
+    # 各阶段节点集合与 (阶段, 场景)→节点 映射
+    stage_nodes = {1: [("root", 0)]}
+    node_of = np.zeros((nstage + 1, K), dtype=int)           # node_of[s][ω]
+    sizes = {1: [K]}
+    for s in range(2, nstage + 1):
+        if s in perfect:                                    # 逐场景决策: 每场景一个节点
+            stage_nodes[s] = list(range(K))
+            node_of[s] = np.arange(K)
+            sizes[s] = [1] * K
+        else:
+            stage_nodes[s] = list(range(len(nodes[s - 2])))
+            for n, nd in enumerate(nodes[s - 2]):
+                node_of[s, nd["members"]] = n
+            sizes[s] = [nd["n"] for nd in nodes[s - 2]]
+    stg = np.zeros(144, dtype=int)                          # slot → 阶段
+    for s in range(1, nstage + 1):
+        stg[blk[s - 1][0]:blk[s - 1][1]] = s
 
     # ---- 变量表 ----
     idx = {}
     nv = 0
     for t in range(144):
         idx[("P", t)] = nv; nv += 1
-    for t in range(*BLK[0]):
+    for t in range(*blk[0]):
         idx[("D1", t)] = nv; nv += 1
-    for s in (2, 3, 4):
+    for s in range(2, nstage + 1):
         for n in stage_nodes[s]:
-            for t in range(*BLK[s - 1]):
+            for t in range(*blk[s - 1]):
                 idx[("Q", s, n, t)] = nv; nv += 1
                 idx[("D", s, n, t)] = nv; nv += 1
                 idx[("DP", s, n, t)] = nv; nv += 1           # DEV+ : Q - P
@@ -121,13 +141,13 @@ def build_lp(scen, tree, soc0, lam):
 
     # ---- 目标 ----
     c = np.zeros(NV)
-    for t in range(*BLK[0]):                                # 计划购电只在 0:00-6:00 计费(§2.7 其一)
-        c[idx[("P", t)]] += lam[t]                          # t>=36 的 P 只作偏差参照, 不得再计费
+    for t in range(*blk[0]):                                # 计划购电只在其块内计费(§2.7 其一)
+        c[idx[("P", t)]] += lam[t]                          # n_sessions>0: 块=(0,36); =0: 全天 144 段
         c[idx[("D1", t)]] += CYCLE_EPS                      # 吞吐罚
-    for s in (2, 3, 4):
+    for s in range(2, nstage + 1):
         for n in stage_nodes[s]:
             pn = sizes[s][n] / K
-            for t in range(*BLK[s - 1]):
+            for t in range(*blk[s - 1]):
                 c[idx[("Q", s, n, t)]] += pn * lam[t] + pn * CYCLE_EPS
                 c[idx[("D", s, n, t)]] += pn * CYCLE_EPS     # 充放吞吐罚(§2.6 CYCLE_EPS)
                 c[idx[("DP", s, n, t)]] += pn * DEV_RATE * lam[t]
@@ -141,26 +161,19 @@ def build_lp(scen, tree, soc0, lam):
 
     rows, cols, vals = [], [], []
     r = 0
-
-    def add(coefs, lo=None, hi=None):
-        """coefs: list of (col, val) → 追加一行(lo<=a·x<=hi)。"""
-        nonlocal r
-        for cc, vv in coefs:
-            rows.append(r); cols.append(cc); vals.append(vv)
-        return r
-
     b_lo, b_hi = [], []
 
     def emit(coefs, lo, hi):
         nonlocal r
-        add(coefs)
+        for cc, vv in coefs:
+            rows.append(r); cols.append(cc); vals.append(vv)
         b_lo.append(lo); b_hi.append(hi); r += 1
 
     # ---- 逐情景逐段物理 ----
     for w in range(K):
         for t in range(144):
-            s = min(t // 36 + 1, 4)
-            n = node_of[s, w]
+            s = int(stg[t])
+            n = node_of[s, w] if s >= 2 else None
             Qc = idx[("P", t)] if s == 1 else idx[("Q", s, n, t)]
             Dc = idx[("D1", t)] if s == 1 else idx[("D", s, n, t)]
             Aw, Gw, Cw = idx[("A", w, t)], idx[("G", w, t)], idx[("C", w, t)]
@@ -183,23 +196,32 @@ def build_lp(scen, tree, soc0, lam):
             emit([(Aw, 1.), (Qc, -1.)], -np.inf, 0.0)
 
     # ---- 偏差罚 ----
-    for s in (2, 3, 4):
+    for s in range(2, nstage + 1):
         for n in stage_nodes[s]:
-            for t in range(*BLK[s - 1]):
+            for t in range(*blk[s - 1]):
                 Qc = idx[("Q", s, n, t)]; Pc = idx[("P", t)]
                 emit([(idx[("DP", s, n, t)], 1.), (Qc, -1.), (Pc, 1.)], 0.0, np.inf)
                 emit([(idx[("DN", s, n, t)], 1.), (Qc, 1.), (Pc, -1.)], 0.0, np.inf)
+
+    # ---- 冻结首阶段(标准 EEV): P 全天, D1 取计划块 ----
+    if fix:
+        if "P" in fix:
+            for t in range(144):
+                emit([(idx[("P", t)], 1.)], float(fix["P"][t]), float(fix["P"][t]))
+        if "D1" in fix:
+            for j, t in enumerate(range(*blk[0])):
+                emit([(idx[("D1", t)], 1.)], float(fix["D1"][j]), float(fix["D1"][j]))
 
     # ---- 界 ----
     bounds = [(0.0, None)] * NV
     for w in range(K):
         for t in range(144):
             bounds[idx[("E", w, t)]] = (EMIN, EMAX)
-    for s in (2, 3, 4):
+    for s in range(2, nstage + 1):
         for n in stage_nodes[s]:
-            for t in range(*BLK[s - 1]):
+            for t in range(*blk[s - 1]):
                 bounds[idx[("D", s, n, t)]] = (0.0, PMAX)
-    for t in range(*BLK[0]):
+    for t in range(*blk[0]):
         bounds[idx[("D1", t)]] = (0.0, PMAX)
 
     A_all = coo_matrix((vals, (rows, cols)), shape=(r, NV)).tocsr()
@@ -220,13 +242,17 @@ def build_lp(scen, tree, soc0, lam):
             Aub_rows.append(-row); Aub_b.append(-b_lo[i])
     A_ub = vstack(Aub_rows).tocsr(); b_ub = np.array(Aub_b, dtype=float)
     return dict(c=c, A_ub=A_ub, b_ub=b_ub, A_eq=A_eq, b_eq=b_eq, bounds=bounds,
-                idx=idx, NV=NV, node_of=node_of, sizes=sizes, K=K)
+                idx=idx, NV=NV, node_of=node_of, sizes=sizes, K=K,
+                nstage=nstage, blk=blk, stg=stg)
 
 
 def solve_day(e, soc0, lam, verbose=False):
     """解第 e 个评估日的四阶段随机规划。e=0 为冷启动(确定性中心单场景)。"""
     if e == 0:
-        scen = dict(K=1, PV_slot=C_slot_adj[0, e][None, :].copy(), L_slot=L_adj[e][None, :].copy(),
+        # 中心十分钟光伏须截零: C_slot_adj 经终偏校正后个别段可为微负, 而 PV 是 G+C≤PV 的上界,
+        # 负上界会使 LP 不可行(与 build_scenarios 的截零口径一致)。
+        scen = dict(K=1, PV_slot=np.maximum(C_slot_adj[0, e], 0.0)[None, :].copy(),
+                    L_slot=L_adj[e][None, :].copy(),
                     idx=np.array([0]), A_hour=C_adj[e, 0][None, :])
         tree = dict(nodes=[[dict(members=np.array([0]), n=1, parent=0)],
                            [dict(members=np.array([0]), n=1, parent=0)],

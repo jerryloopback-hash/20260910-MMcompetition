@@ -69,10 +69,15 @@ def pca_top2(X):
 
 
 def kmeans_fixed(X, k, seed):
-    """scipy kmeans2 包装: 固定种子; 返回标签与投影空间质心。"""
+    """scipy kmeans2 包装: 固定种子; 返回标签与投影空间质心。
+    防御: 活维数为 0(该块在池内全为常量, 如早春 18:00–23:00 原始残差恒零)时,
+    PCA 投影 Z 为 (n,0), kmeans2 会抛 "Empty input" —— 退回单一簇。主模型路径不会触发
+    (M5 全 334 日已跑通), 仅为原始预报臂等退化输入的健壮性。"""
     k = max(1, min(k, len(X)))
-    if k == 1:
-        return np.zeros(len(X), dtype=int), X.mean(axis=0, keepdims=True)
+    if k == 1 or X.shape[1] == 0:
+        return (np.zeros(len(X), dtype=int),
+                np.zeros((1, X.shape[1]), dtype=float) if X.shape[1] == 0
+                else X.mean(axis=0, keepdims=True))
     cent, lab = kmeans2(X, k, iter=30, minit="++", seed=seed)
     return lab.astype(int), cent
 
