@@ -20,3 +20,17 @@ desktop.ini
 # 编辑器
 .idea/
 .vscode/
+
+# ===== LaTeX 编译产物（论文） =====
+# 论文编译输出目录：Cpaper.pdf / .aux / .log / .synctex.gz 全部在此
+C题/outcome/out/
+
+# 兜底：在 C题 下其它位置直接编译 tex 时产生的中间文件
+# 注意：*.pdf 不做全局忽略，题目 PDF 与 paper/refs/ 下的文献 PDF 需要保留
+C题/**/*.aux
+C题/**/*.log
+C题/**/*.synctex
+C题/**/*.synctex.gz
+C题/**/*.fls
+C题/**/*.fdb_latexmk
+C题/**/*.missfont.log
