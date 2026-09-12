@@ -30,7 +30,7 @@ from statsmodels.tsa.seasonal import STL
 import os, warnings, time
 warnings.filterwarnings('ignore')
 
-DATA_PATH = r'D:\CUMCM2026Problems\C题\附件\附件2.xlsx'
+DATA_PATH = r'C:\Users\adminl\Desktop\20260910-MMcompetition\C题\附件\附件2.xlsx'
 OUT_DIR = r'D:\CUMCM2026Problems\C题\预测结果'
 os.makedirs(OUT_DIR, exist_ok=True)
 
