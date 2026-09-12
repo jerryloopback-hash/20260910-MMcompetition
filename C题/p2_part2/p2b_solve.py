@@ -6,7 +6,8 @@ P2B 求解器:三组预测来源对比  v3
   模型池组  — EGD 六模型时变集成(已交付: load_pred_ens.npy / pv_pred_ens.npy)
   LSTM组    — 待交付(建议 load_pred_lstm.npy / pv_pred_lstm.npy)
   XGBoost组 — 待交付(建议 load_pred_xgb.npy  / pv_pred_xgb.npy)
-每组运行: 0:00 计划层(P1 同构 LP, 输入=该组预测, E0=前日执行末SOC, E(24)=E(0)钉扎)
+每组运行: 0:00 计划层(输入=该组预测, E0=前日执行末SOC, 不钉扎 E(24)=E(0))
+        -> 目标扣除日末储能可利用价值 0.9*λ_144*E(24)
         -> 日内严格执行(仅物理截断, [1200,10800] 恒成立), 缺口 max(0, L-[购电+实际光伏+放电])
         -> 紧急购电 5λ 强制补足(硬约束), 购电按计划量计费。
 另跑: 完美预见下界(预测=实际, hindsight 基准)。
@@ -27,6 +28,7 @@ PRED = BASE/"p2_part1"/"预测结果"
 OUT  = Path(__file__).resolve().parent/"p2b_三组预测对比.xlsx"
 
 DT = 1/6.0; ETA = 0.9; T = 144; EMIN, EMAX = 1200.0, 10800.0; PMAX = 5000.0
+CYCLE_EPS = 1e-4                                       # 元/kWh, 仅用于打破同成本储能内循环退化解
 WIN = 56; K0 = 7.0                                     # 残差窗/池深收缩(修正分支备用)
 SMOKE = len(sys.argv) > 1 and sys.argv[1] == "smoke"
 NDAYS = 5 if SMOKE else 334
@@ -87,16 +89,17 @@ if (PRED/"load_pred_models_v5.npy").exists() and (PRED/"pv_pred_models_v5.npy").
 NV = T*6
 idx = {k: np.arange(j, NV, 6) for j, k in enumerate("abgcdq")}
 
+
 def soc_row(u):
     r = np.zeros(NV)
     r[idx["b"][:u+1]] += ETA*DT; r[idx["c"][:u+1]] += ETA*DT; r[idx["d"][:u+1]] -= DT/ETA
     return r
 
-A_eq = np.zeros((2*T+1, NV))
+
+A_eq = np.zeros((2*T, NV))
 for t in range(T):
     A_eq[2*t,   idx["a"][t]] = 1; A_eq[2*t,   idx["g"][t]] = 1; A_eq[2*t, idx["d"][t]] = 1   # 负载平衡
     A_eq[2*t+1, idx["g"][t]] = 1; A_eq[2*t+1, idx["c"][t]] = 1; A_eq[2*t+1, idx["q"][t]] = 1 # 光伏平衡
-A_eq[-1] = soc_row(T-1)                                                                        # E(24)=E(0)
 A_ub = np.zeros((4*T, NV))
 for t in range(T):                                                                             # SOC 带(所有节点)
     A_ub[2*t] = soc_row(t); A_ub[2*t+1] = -soc_row(t)
@@ -104,11 +107,19 @@ for t in range(T):                                                              
     A_ub[2*T+2*t,   idx["b"][t]] = 1; A_ub[2*T+2*t,   idx["c"][t]] = 1
     A_ub[2*T+2*t+1, idx["d"][t]] = 1
 c_obj = np.zeros(NV); c_obj[idx["a"]] = lam*DT; c_obj[idx["b"]] = lam*DT
+# 极小吞吐惩罚只用于排除同段充放的退化解，不计入报告成本。
+c_obj[idx["b"]] += CYCLE_EPS*DT
+c_obj[idx["c"]] += CYCLE_EPS*DT
+c_obj[idx["d"]] += CYCLE_EPS*DT
+# 日末储能价值: -η*λ_144*E_144。常数项 -η*λ_144*E0 不影响最优解，
+# 对 E_144-E0=soc_row(T-1)@x 的线性系数直接并入目标。
+c_obj -= ETA*lam[-1]*soc_row(T-1)
+
 
 def solve_day(Lf, Pf, E0):
-    """给定当日144时段预测与初始SOC, 解计划购电 LP, 返回 (a,b,g,c,d) 各144"""
-    b_eq = np.empty(2*T+1)                    # 行序与 A_eq 一致: 偶=负载平衡, 奇=光伏平衡, 末=净零
-    b_eq[0:2*T:2] = Lf; b_eq[1:2*T:2] = Pf; b_eq[-1] = 0.0
+    """给定当日144时段预测与初始SOC, 解含日末储能价值的计划购电 LP。"""
+    b_eq = np.empty(2*T)                      # 行序与 A_eq 一致: 偶=负载平衡, 奇=光伏平衡
+    b_eq[0:2*T:2] = Lf; b_eq[1:2*T:2] = Pf
     b_ub = np.empty(4*T)
     b_ub[0:2*T:2] = EMAX - E0; b_ub[1:2*T:2] = E0 - EMIN; b_ub[2*T:] = PMAX
     r = linprog(c_obj, A_ub=A_ub, b_ub=b_ub, A_eq=A_eq, b_eq=b_eq,
@@ -156,6 +167,7 @@ def margins_quantile(tau, k, resL, resP):
 # ---------- 5. 单组全年 ----------
 def run_year(fL_g, fP_g, tag="", kind="none", params=None):
     E0 = 6000.0
+    initial_value = ETA*lam[0]*E0
     pc = ec = ge = 0.0; pe = 0.0; ngap = 0
     smin = 1e18; smax = -1e18
     monthly = defaultdict(lambda: [0.0, 0.0, 0.0])           # 月 -> [计划费, 紧急费, 缺口kWh]
@@ -190,8 +202,14 @@ def run_year(fL_g, fP_g, tag="", kind="none", params=None):
         E0 = Eend; e0_traj[k] = E0
         if (k+1) % 120 == 0:
             print(f"   [{tag}] {k+1}/{N} 天  累计 计划{pc:,.0f} 紧急{ec:,.0f} 元  ({time.time()-t0:.0f}s)")
-    return dict(group=tag, plan=pc, emerg=ec, total=pc+ec, gapE=ge,
-                ngap=ngap, purchE=pe, smin=smin, smax=smax, monthly=monthly, e0=e0_traj)
+    terminal_value = ETA*lam[-1]*E0
+    gross = pc + ec
+    net = gross - terminal_value
+    net_change = gross - (terminal_value - initial_value)
+    return dict(group=tag, plan=pc, emerg=ec, gross=gross,
+                terminal_value=terminal_value, total=net, net_change=net_change,
+                initial_value=initial_value, end_soc=E0, gapE=ge, ngap=ngap,
+                purchE=pe, smin=smin, smax=smax, monthly=monthly, e0=e0_traj)
 
 # ---------- 6. 主流程 ----------
 if __name__ == "__main__":
@@ -203,8 +221,11 @@ if __name__ == "__main__":
     print("\n=== 完美预见下界(预测=实际) ===")
     r = run_year(None, None, tag="PF", kind="pf")
     rows.append({"组": "完美预见下界", **{k: r[k] for k in
-                 ("plan", "emerg", "total", "gapE", "ngap", "purchE", "smin", "smax")}})
-    print(f"   总费用 {r['total']:,.0f} 元 | 缺口 {r['gapE']:,.3f} kWh")
+                 ("plan", "emerg", "gross", "terminal_value", "total", "net_change",
+                  "end_soc", "gapE", "ngap", "purchE", "smin", "smax")}})
+    print(f"   净成本 {r['total']:,.0f} 元 = 能源支出 {r['gross']:,.0f} - "
+          f"期末储能价值 {r['terminal_value']:,.0f} | 期末SOC {r['end_soc']:.0f} kWh"
+          f" | 缺口 {r['gapE']:,.3f} kWh")
     pf_total = r["total"]
     assert r["gapE"] < 1.0, "完美预见下缺口应≈0"
 
@@ -212,9 +233,11 @@ if __name__ == "__main__":
         print(f"\n=== 组: {g} (原始预测直喂) ===")
         r = run_year(aL, aP, tag=g, kind="none")
         rows.append({"组": g, **{k: r[k] for k in
-                     ("plan", "emerg", "total", "gapE", "ngap", "purchE", "smin", "smax")}})
+                     ("plan", "emerg", "gross", "terminal_value", "total", "net_change",
+                      "end_soc", "gapE", "ngap", "purchE", "smin", "smax")}})
         monthly_store[g] = r["monthly"]
-        print(f"   总 {r['total']:>10,.0f} 元 = 计划 {r['plan']:>9,.0f} + 紧急 {r['emerg']:>9,.0f}"
+        print(f"   净 {r['total']:>10,.0f} 元 = 支出 {r['gross']:>10,.0f} - 储能价值 {r['terminal_value']:>7,.0f}"
+              f" | 期末SOC {r['end_soc']:.0f} kWh | 计划 {r['plan']:>9,.0f} + 紧急 {r['emerg']:>9,.0f}"
               f" | 缺口 {r['gapE']:>8,.0f} kWh ({r['ngap']}时段) | SOC[{r['smin']:.0f},{r['smax']:.0f}]"
               f" | 误差代价 {r['total']-pf_total:,.0f} 元")
 
@@ -222,26 +245,30 @@ if __name__ == "__main__":
     qL = np.load(PRED/"load_quantiles_v5.npy"); qP = np.load(PRED/"pv_quantiles_v5.npy")
     assert qL.shape == (334, T, 4) and qP.shape == (334, T, 4), "分位数交付形状异常"
     assert np.isfinite(qL).all() and np.isfinite(qP).all()
-    QCOMBOS = [("分位τ=0.50(中性)", 1, 1), ("分位τ=0.833(报童)", 2, 0),
-               ("分位τ=0.90(强保险)", 3, 0), ("分位τ=0.10(激进对照)", 0, 3)]
+    QCOMBOS = [("分位负载P0.50/光伏P0.50(离散对照)", 1, 1),
+                ("分位负载P0.833/光伏P0.10(离散对照)", 2, 0),
+                ("分位负载P0.90/光伏P0.10(离散对照)", 3, 0),
+                ("分位负载P0.10/光伏P0.90(离散对照)", 0, 3)]
     print("\n=== 决策分位组合(队友分位数直读: 负载P_τ / 光伏P_{1-τ}) ===")
     for lab, il, ip in QCOMBOS:
         r = run_year(np.ascontiguousarray(qL[:, :, il]), np.ascontiguousarray(qP[:, :, ip]), tag=lab, kind="none")
         rows.append({"组": lab, **{k: r[k] for k in
-                     ("plan", "emerg", "total", "gapE", "ngap", "purchE", "smin", "smax")}})
+                     ("plan", "emerg", "gross", "terminal_value", "total", "net_change",
+                      "end_soc", "gapE", "ngap", "purchE", "smin", "smax")}})
         monthly_store[lab] = r["monthly"]
-        print(f"   {lab} | 总 {r['total']:>10,.0f} 元 = 计划 {r['plan']:>9,.0f} + 紧急 {r['emerg']:>9,.0f}"
+        print(f"   {lab} | 净 {r['total']:>10,.0f} = 支出 {r['gross']:>10,.0f} - 储能价值 {r['terminal_value']:>7,.0f}"
+              f" | 期末SOC {r['end_soc']:.0f} | 计划 {r['plan']:>9,.0f} + 紧急 {r['emerg']:>9,.0f}"
               f" | 缺口 {r['gapE']:>8,.0f} kWh ({r['ngap']}时段)")
 
     df = pd.DataFrame(rows)
     groups_df = df[df["组"] != "完美预见下界"].sort_values("total")
-    print("\n===== 全方案横向对比(升序) =====")
-    print(groups_df[["组", "plan", "emerg", "total", "gapE", "ngap"]].to_string(index=False))
+    print("\n===== 全方案横向对比(按净成本升序) =====")
+    print(groups_df[["组", "gross", "terminal_value", "total", "end_soc", "gapE", "ngap"]].to_string(index=False))
     if len(groups_df) >= 2:
         best, worst = groups_df.iloc[0], groups_df.iloc[-1]
         print(f"\n最优组: {best['组']} ({best['total']:,.0f} 元);"
               f"最差组: {worst['组']} ({worst['total']:,.0f} 元);组间差 {worst['total']-best['total']:,.0f} 元")
-    print(f"完美预见下界 {pf_total:,.0f} 元;各组误差代价 = 组总费用 - 下界")
+    print(f"完美预见下界净成本 {pf_total:,.0f} 元;各组误差代价 = 净成本 - 下界")
 
     if not SMOKE:
         with pd.ExcelWriter(OUT, engine="openpyxl") as w:
