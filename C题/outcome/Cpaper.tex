@@ -269,8 +269,9 @@ S_t=\sum_{s\le t}\Bigl[\,0.9\,(b_s+c_s)-d_s/0.9\,\Bigr]\Delta t ,
 非零元随时段增多，约束矩阵变得更稠密，但这在 144 段的规模下不构成负担。
 
 最终交给求解器的是 864 个决策量、289 个等式约束与 576 个不等式约束。
-在实际求解中，容量界限行与终端归零行的对偶变量合成了各时点的节点边际价值，~\ref{sub:dual} 节的 $\gamma$ 递推将直接构造自这组输出。求解调用 scipy.optimize.linprog 接口
-的 HiGHS 求解器，容差沿用默认设置，单次求解约 0.25~s。
+在实际求解中，容量界限行与终端归零行的对偶变量合成了各时点的节点边际价值，~\ref{sub:dual} 节的 $\gamma$ 递推将直接构造自这组输出，
+求解调用 scipy.optimize.linprog 接口
+的 HiGHS 求解器。
 
 求解器在返回最优解的同时给出全部对偶变量，~\ref{sub:dual} 节的影子价格直接取自这一输出；
 求解前后还通过了以下三类自检：
@@ -1124,7 +1125,26 @@ VSS较大进一步说明本随机规划的有效性。
 策略的低期望费用并不存在极端差解的代价。
 
 \section{问题4模型的建立与求解}
-% TODO：附件4 波动电价替代分时电价，重算问题2与问题3；输出 result4-2.xlsx、result4-3.xlsx。
+
+\subsection{基于电价特征的模型池重构}
+
+\subsubsection{电价序列特征分析}
+\subsubsection{成员模型选择}
+\subsubsection{模型预测频率的调整}
+
+\subsection{重构模型评价}
+\subsubsection{}
+\subsubsection{评估引入负载及光伏预测值}
+\subsubsection{过拟合检验}
+\subsubsection{学习率灵敏度检验}
+\subsubsection{月度稳定性检验}
+
+\subsection{前问复现}
+\subsubsection{问题二复现}
+\subsubsection{问题三复现}
+
+
+
 
 % ===================== 9 总结（占位） =====================
 \section{模型评价与总结}
