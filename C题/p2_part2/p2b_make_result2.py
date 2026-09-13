@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""
+r"""
 生成问题2交付文件 result2.xlsx (2026-09-12)
 ================================================
 口径与 p2b_quantile_sweep.py / p2b_solve.py 完全一致:
@@ -8,9 +8,12 @@
   计划层 = p2b_solve.solve_day(LP, 含日末储能价值项), 执行结算与 p2b_solve.settle 同逻辑
   E0 滚动: E0^(d+1) = 执行层末SOC, 首日 6000 kWh
 输出(模板 = 附件/附件5/result2.xlsx, 成品另存 p2_part2/result2.xlsx):
-  计划购电量: 模板列序 [I_2..I_144 | I_1](kWh) + 全天购电量 + 全天购电费(按表内取整值计)
-  充放电量:   每日 6 块的执行充电/放电量(kWh) + 0:00/24:00 执行储电量
-  紧急购电量: 连续缺口区间合并记账(表4 格式, kWh)
+  计划购电量: 模板列序 [I_2..I_144 | I_1](kWh) + 全天购电量 + 全天购电费(按表内取整值计);
+              模板若有"日期"列则逐行填日期
+  充放电量:   每日 6 块的执行充电/放电量(kWh) + 0:00/24:00 执行储电量; 日期列逐行填写
+  紧急购电量: v2(2026-09-13) 改为逐 10 分钟粒度 334天×144时段全列(含购电量为 0 的时段,
+              每行带日期), 不再按表4 合并区间
+另生成: outcome/tab_p2day3.tex = 论文表3(四个指定日期的非零紧急购电时段), 供 Cpaper.tex \input
 自检:
   1) 逐日 settle_full 与 p2b_solve.settle 的计划费/紧急费/末SOC 逐项一致
   2) 全年 plan/emerg/total 与 p2b_分位遍历存档中 tau=0.81 行对账
@@ -123,7 +126,8 @@ if __name__ == "__main__":
     print("[2/3] 逐日 LP + 执行结算 ...")
     plan_rows = []          # 每日 144 值, 模板列序 [I_2..I_144 | I_1]
     block_rows = []         # 每日 6 块 (chg, dis) + (E0, E24)
-    gap_rows = []           # (date, 'H:MM-H:MM', kWh)
+    gap_rows = []           # (date, [(合并区间label, kWh)]) 仅用于控制台汇总
+    gap_grid = []           # (v2) 每日 144 时段紧急购电量(kWh, 取整2位), 含 0
     spec_pick = {}          # 指定日期 -> (全天购电量, 全天购电费, blocks, E0, E24, gaps)
     E0 = 6000.0
     tot_plan = tot_emerg = 0.0
@@ -163,6 +167,7 @@ if __name__ == "__main__":
         block_rows.append((chg_blk, dis_blk, round(E0, 2), round(Eend, 2)))
 
         d = dates[drow]
+        gap_grid.append(np.round(gap_e, 2) + 0.0)
         idx = np.where(gap_e > 1e-9)[0]
         day_gaps = []
         if idx.size:
@@ -176,7 +181,7 @@ if __name__ == "__main__":
         date_str = pd.Timestamp(d).strftime("%Y-%m-%d")
         if date_str in SPEC_DATES:
             spec_pick[date_str] = (day_energy, round(day_cost, 2), chg_blk, dis_blk,
-                                   round(E0, 2), round(Eend, 2), day_gaps)
+                                   round(E0, 2), round(Eend, 2), day_gaps, gap_grid[-1])
         tot_plan += pc
         tot_emerg += ec
         E0 = Eend
@@ -198,64 +203,150 @@ if __name__ == "__main__":
         and abs(net - rr["total"]) < 0.5, "与遍历存档对账失败"
     print("[对账] 与遍历存档一致 ✓")
 
-    # ---------- 4. 写 result2.xlsx ----------
+    # ---------- 4. 写 result2.xlsx (列位按模板表头自适应, 防错位) ----------
     print("[3/3] 写入 result2.xlsx ...")
     wb = openpyxl.load_workbook(TEMPLATE)
+    DATE_FMT = "yyyy/m/d"
 
+    def hdr_map(ws):
+        return {str(c.value).strip(): c.column for c in ws[1] if c.value is not None}
+
+    def find_col(ws, hd, *keys, exclude=()):
+        hits = [c for h, c in sorted(hd.items(), key=lambda kv: kv[1])
+                if all(k in h for k in keys) and not any(e in h for e in exclude)]
+        if len(hits) != 1:
+            raise RuntimeError(f"[{ws.title}] 表头无法唯一定位 {keys}, 实际表头: {hd}")
+        return hits[0]
+
+    def put_date(ws, row, col, d):
+        c = ws.cell(row=row, column=col, value=d)
+        c.number_format = DATE_FMT
+
+    # --- 计划购电量 ---
     ws = wb["计划购电量"]
+    hd = hdr_map(ws)
+    col_day = next((c for h, c in hd.items() if "日期" in h), None)
+    col_tot = find_col(ws, hd, "全天购电量")
+    col_cost = find_col(ws, hd, "全天购电费")
+    if col_day is not None:
+        assert col_tot - col_day == 145, f"计划购电量列序异常: 日期列{col_day}, 全天列{col_tot}"
     for k in range(N):
         r = k + 2
         vals_r, day_energy, day_cost = plan_rows[k]
         for j, v in enumerate(vals_r):
             ws.cell(row=r, column=2 + j, value=float(v))
-        ws.cell(row=r, column=146, value=day_energy)
-        ws.cell(row=r, column=147, value=day_cost)
+        ws.cell(row=r, column=col_tot, value=day_energy)
+        ws.cell(row=r, column=col_cost, value=day_cost)
+        if col_day is not None:
+            put_date(ws, r, col_day, pd.Timestamp(dates[i_feb1 + k]).to_pydatetime())
 
+    # --- 充放电量: 日期逐行; SOC 按表头自适应(0:00/24:00 两个储电量列, 或 时刻列+储电量列) ---
     ws = wb["充放电量"]
     if ws.max_row > 1:
         ws.delete_rows(2, ws.max_row - 1)
+    hd = hdr_map(ws)
+    if not any("日期" in h for h in hd):
+        ws.insert_cols(1)
+        ws.cell(row=1, column=1, value="日期")
+        hd = hdr_map(ws)
+    col_date = find_col(ws, hd, "日期")
+    col_itv = find_col(ws, hd, "时间段")
+    col_chg = find_col(ws, hd, "充电量", exclude=("放",))
+    col_dis = find_col(ws, hd, "放电量")
+    soc_cols = sorted(c for h, c in hd.items() if "储电量" in h)
+    if len(soc_cols) >= 2:
+        e0_col = next((c for c in soc_cols
+                       if "0:00" in str(ws.cell(row=1, column=c).value)
+                       and "24:00" not in str(ws.cell(row=1, column=c).value)), None)
+        e24_col = next((c for c in soc_cols
+                        if "24:00" in str(ws.cell(row=1, column=c).value)), None)
+        if e0_col is None or e24_col is None:
+            raise RuntimeError(f"[{ws.title}] 储电量列表头无 0:00/24:00 标识: {hd}")
+        t_col = soc_col = None
+    elif len(soc_cols) == 1:
+        e0_col = e24_col = None
+        soc_col = soc_cols[0]
+        t_col = soc_col - 1
+    else:
+        raise RuntimeError(f"[{ws.title}] 未找到储电量列头, 实际表头: {hd}")
+
     for k in range(N):
-        d = dates[i_feb1 + k]
+        d = pd.Timestamp(dates[i_feb1 + k]).to_pydatetime()
         chg_blk, dis_blk, e0, e24 = block_rows[k]
-        base = ws.max_row + 1
+        base = 2 + k * 6
         for s in range(6):
             r = base + s
-            if s == 0:
-                ws.cell(row=r, column=1, value=pd.Timestamp(d).to_pydatetime())
-            ws.cell(row=r, column=2, value=["0:00-4:00", "4:00-8:00", "8:00-12:00",
-                                            "12:00-16:00", "16:00-20:00", "20:00-24:00"][s])
-            ws.cell(row=r, column=3, value=chg_blk[s])
-            ws.cell(row=r, column=4, value=dis_blk[s])
-            if s == 0:
-                ws.cell(row=r, column=5, value=dtime(0, 0))
-                ws.cell(row=r, column=6, value=e0)
-            elif s == 1:
-                ws.cell(row=r, column=5, value="24:00")
-                ws.cell(row=r, column=6, value=e24)
+            put_date(ws, r, col_date, d)
+            ws.cell(row=r, column=col_itv, value=["0:00-4:00", "4:00-8:00", "8:00-12:00",
+                                                  "12:00-16:00", "16:00-20:00", "20:00-24:00"][s])
+            ws.cell(row=r, column=col_chg, value=chg_blk[s])
+            ws.cell(row=r, column=col_dis, value=dis_blk[s])
+        if e0_col is not None:
+            ws.cell(row=base, column=e0_col, value=e0)
+            ws.cell(row=base, column=e24_col, value=e24)
+        else:
+            ws.cell(row=base, column=t_col, value="0:00")
+            ws.cell(row=base, column=soc_col, value=e0)
+            ws.cell(row=base + 1, column=t_col, value="24:00")
+            ws.cell(row=base + 1, column=soc_col, value=e24)
 
+    # --- 紧急购电量: v2 逐 10 分钟粒度, 334天×144时段全列(含 0), 每行带日期 ---
     ws = wb["紧急购电量"]
     if ws.max_row > 1:
         ws.delete_rows(2, ws.max_row - 1)
-    for d, day_gaps in gap_rows:
-        base = ws.max_row + 1
-        for i, (label, kwh) in enumerate(day_gaps):
-            r = base + i
-            if i == 0:
-                ws.cell(row=r, column=1, value=pd.Timestamp(d).to_pydatetime())
-            ws.cell(row=r, column=2, value=label)
-            ws.cell(row=r, column=3, value=kwh)
+    hd = hdr_map(ws)
+    col_date = find_col(ws, hd, "日期")
+    col_itv = find_col(ws, hd, "时间段")
+    col_amt = find_col(ws, hd, "购电量", exclude=("计划", "全天"))
+    labels = [f"{fmt_clock(s * 10)}-{fmt_clock((s + 1) * 10)}" for s in range(T)]
+    r = 1
+    for k in range(N):
+        arr = gap_grid[k]
+        d = pd.Timestamp(dates[i_feb1 + k]).to_pydatetime()
+        for s in range(T):
+            r += 1
+            put_date(ws, r, col_date, d)
+            ws.cell(row=r, column=col_itv, value=labels[s])
+            ws.cell(row=r, column=col_amt, value=float(arr[s]))
 
     wb.save(OUT)
     n_gap_days = len(gap_rows)
     n_gap_itv = sum(len(g) for _, g in gap_rows)
     print(f"\n已保存 -> {OUT}")
-    print(f"紧急购电: {n_gap_days} 天有缺口, 共 {n_gap_itv} 个连续区间; "
-          f"全年购电量合计 {sum(r[1] for r in plan_rows):,.2f} kWh")
+    print(f"紧急购电量工作表: {N * T} 行 = 334天 × 144个10分钟时段(含购电量为0的时段); "
+          f"有缺口 {n_gap_days} 天、合并区间 {n_gap_itv} 个; "
+          f"全年紧急购电量 {sum(float(a.sum()) for a in gap_grid):,.2f} kWh; "
+          f"计划购电量合计 {sum(r[1] for r in plan_rows):,.2f} kWh")
+
+    # ---------- 5. 论文表3片段: 四指定日期非零 10 分钟时段 -> outcome/tab_p2day3.tex ----------
+    frag = HERE.parent / "outcome" / "tab_p2day3.tex"
+    col_data = []
     for ds in SPEC_DATES:
-        de, dc, cb, db, e0, e24, gs = spec_pick[ds]
+        arr = spec_pick[ds][7]
+        col_data.append([(labels[s], arr[s]) for s in range(T) if arr[s] > 0.0])
+    lines = [
+        "% 由 p2_part2/p2b_make_result2.py 自动生成(tau=0.81, 口径同 result2.xlsx), 勿手改数值。",
+        "% 各日期非零10分钟时段数: " + ", ".join(f"{ds[-5:]}={len(c)}" for ds, c in zip(SPEC_DATES, col_data)),
+    ]
+    for i in range(max(len(c) for c in col_data)):
+        cells = []
+        for c in col_data:
+            cells += [c[i][0], f"{c[i][1]:.2f}"] if i < len(c) else ["", ""]
+        lines.append(" & ".join(cells) + r" \\")
+    # 末行不带 \\: \input 文件尾与 \\ 的可选参数前瞻相冲会导致 Misplaced \noalign,
+    # 行结束由 Cpaper.tex 中 \input{tab_p2day3} 后的 \\ 提供
+    if lines[-1].endswith(r" \\"):
+        lines[-1] = lines[-1][: -len(r" \\")]
+    frag.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    print(f"论文表3片段 -> {frag}")
+
+    for ds in SPEC_DATES:
+        de, dc, cb, db, e0, e24, gs, ga = spec_pick[ds]
+        nz = [(labels[s], ga[s]) for s in range(T) if ga[s] > 0]
         print(f"\n指定日期 {ds}: 全天购电 {de:,.2f} kWh, 计划费 {dc:,.2f} 元, "
               f"0:00 SOC {e0:,.0f} -> 24:00 SOC {e24:,.0f} kWh")
         print(f"  六块充电 {cb}")
         print(f"  六块放电 {db}")
-        print(f"  紧急购电 {len(gs)} 段: {gs if len(gs) <= 8 else gs[:8] + [('...', '...')]}")
+        print(f"  紧急购电非零时段 {len(nz)} 个(合并区间 {len(gs)} 个): "
+              f"{nz if len(nz) <= 8 else nz[:8] + [('...', '...')]}")
     print(f"\n完成, 耗时 {time.time() - t0:.0f}s")
