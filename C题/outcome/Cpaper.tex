@@ -1078,11 +1078,45 @@ AE为 0.88，显著优于基线。
 
 \subsection{前问复现}
 
+如上文所述，本问较问题二、问题三仅在电价上做出实时变化，其余部分与问题二、问题三的模型基本一致，故仍沿用问题二、问题三的求解模型。唯一的变化在于电价预测值需实时更新：问题二以 24~h 为周期，问题三以 6~h 为周期，其余设定不变。因此本节只需将 8.1 节中得出的电价预测值代入问题二、问题三的模型中，即可完成复现求解。
+
 \subsubsection{问题二复现}
+
+将上文所得的 24~h 周期电价预测值代入问题二的逐日 LP 求解模型，得到问题二的复现结果如表~\ref{tab:p4p2result} 所示。
+
+\begin{table}[htbp]
+\centering
+\caption{问题二全年费用（费用单位：万元）}
+{\small
+\begin{tabular}{lr}
+\toprule
+电价方案 & 成本 \\
+\midrule
+EGD日前电价 & \textbf{1722.22} \\
+以上周同天电价做预测值 & 1726.01 \\
+\bottomrule
+\end{tabular}}
+\label{tab:p4p2result}
+\end{table}
 
 \subsubsection{问题三复现}
 
+将上文所得的 6~h 周期电价预测值代入问题三的四阶段随机规划求解模型，得到问题三的复现结果如表~\ref{tab:p4p3result} 所示。
 
+\begin{table}[htbp]
+\centering
+\caption{问题三全年费用（费用单位：万元，紧急购电量单位：万kWh）}
+{\small
+\begin{tabular}{lrrrrr}
+\toprule
+电价方案 & 购电费 & 偏差费 & 紧急购电费 & 总费用 & 紧急购电量 \\
+\midrule
+四会话滚动更新 & 1328.97 & 21.74 & 195.81 & \textbf{1546.52} & \textbf{35.07} \\
+以24小时为周期预测电价 & 1329.01 & 21.75 & 195.81 & 1546.57 & 35.13 \\
+\bottomrule
+\end{tabular}}
+\label{tab:p4p3result}
+\end{table}
 
 
 
