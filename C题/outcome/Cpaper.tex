@@ -1010,7 +1010,14 @@ VSS较大进一步说明本随机规划的有效性。
 基于二者购电策略频率的不同，我们需要对电价的预测频率进行调整，问题二 24 小时 更新一次，问题三 6 小时 滚动更新一次。
 除更新频率外，问题四的模型与问题二和问题三的模型基本一致。
 流程图如下图~\ref{fig:p4flow}所示。
- %引出模型图（p4 workflow.png）
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.95\textwidth]{p4_workflow.png}
+\caption{问题~3 的随机规划建模与求解流程}
+\label{fig:p4flow}
+\end{figure}
+
 \subsection{基于电价特征的模型池重构}
 
 \subsubsection{电价序列特征分析}
