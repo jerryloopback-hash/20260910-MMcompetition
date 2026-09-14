@@ -1,0 +1,6 @@
+OLD p1 H=842 digitblocks=[(37, 49, "'1\\n'")]
+OLD p2 H=842 digitblocks=[]
+OLD p3 H=842 digitblocks=[]
+NEW p1 H=842 digitblocks=[]
+NEW p2 H=842 digitblocks=[]
+NEW p3 H=842 digitblocks=[]

@@ -8,6 +8,9 @@
 \usepackage[font=small]{caption}
 \graphicspath{{figs/}}
 
+% 正文引用统一为右上角角标
+\newcommand{\upcite}[1]{\textsuperscript{\cite{#1}}}
+
 % 中文字体（宋体正文，黑体加粗；西文 Times New Roman）
 % 宋体无斜体，显式声明 Italic/Slanted 回退到宋体本身，避免 shape undefined 警告
 \setCJKmainfont[BoldFont={SimHei},ItalicFont={SimSun},SlantedFont={SimSun}]{SimSun}
@@ -33,22 +36,38 @@
 
 \begin{document}
 
+% 首页（标题与摘要页）不显示页眉、页脚与页码，页码从次页起自 1 开始
+\thispagestyle{empty}
+
 % ===================== 标题与摘要 =====================
 \begin{center}
-{\zihao{3}\bfseries 基于线性规划与对偶分析的微网计划购电策略}
+{\zihao{3}\bfseries 基于LP、随机规划及模型池预测的微网运转策略}
 \end{center}
 
 \vspace{0.3em}
 \centerline{\textbf{摘\quad 要}}
-% TODO 摘要：各问完成后撰写（deAiWriting 摘要三段式）：
-% ① 问题锚定：微网光-储-负荷协同、双谷双峰分时电价；② 分问题链路（每问"数据→模型→
-% 算法→数值结论"）；③ 验证与特色（三重校验、阈值 1/0.81、规则式对照 +11.71%）
-（占位）摘要待问题 2--4 完成后统一撰写。本问已备妥的数值结论：全天购电 59482.7 kWh、购电费 35126.85 元，较无储能运行节省 26.9\%；充放电启停受阈值 $1/0.81\approx1.235$ 支配；规则式策略较线性规划最优贵 11.71\%。
+在协调外网购电、储电、光伏发电与负载的微网系统中，可以用简洁的LP模型描述这一场景，并找到低价存电、高价用电的节省策略与频繁充放电的能量损失之间的平衡。
+但本题关键在于输入数据的不确定性，对于计划时不可知的数据，本文统一使用基于指数梯度下降的模型池进行高质量预测。并在第三问调整模型为随机优化，通过估计误差分布更好地量化调整计划时的预报价值。
 
-\vspace{0.2em}
-\centerline{\textbf{关键词：}\ 微网；分时电价；储能调度；线性规划；对偶分析}
+在第一问，本文基于电能流梳理和约束翻译建立LP模型，通过HiGHS精确求解，
+并对最优情况的策略进行分析。进行了对偶分析，由 KKT 条件导出 1.235 套利门槛，
+推出最优性经互补松弛与有限差分双重验证。在模型评估中，LP顺利通过对于储能设备最大充放电功率、换能效率的灵敏度分析，防止在实际情况中由于储能设备参数波动导致的模型失效。
+
+第二问基于原LP模型，对紧急购电和储电量成本折算完成LP调整，并采用了EGD加权的模型池对当日的负载和光伏进行日前预测。其中，模型池的差异构建充分考量了两个目标的不同数据特征，兼顾季节切换等中期转变识别、短期陡变快速响应等性能，并通过包括过拟合检验、LSTM指标对比、消融实验等评估。本文并不直接将预测均值带入LP，而是出于紧急购电过重的惩罚考量，通过分位数输出来使预测保守。避免过于保守，采用遍历一系列分位数梯度，解得最优分位数及其对应的最优全年成本1638.75 万元.
+
+考虑到第三问场景直接给出了追索成本，采用随机规划方法来刻画误差分布，找到随机量下的期望总成本最优，并直接量化每份预报的价值。本文首先针对不同预报做系统性误差的矫正，并与第二问EGD模型池预测结果按逆均方误差定权融合，后续证明了对数据源的这两步优化均有效提升模型性能。生成情景路径后，利用3 × 3 × 3 情景树构建四阶段随机规划模型，求解得1468.63万元最低成本，大幅减少紧急购电。进一步计算WS,EEV后，分析EVPI完美价值和VSS实际价值，得到预报均有价值且12:00价值最大。
+
+问题四引入了波动电价，类比问题二构建基于电价特征的模型池，通过EGD时变赋权后，分别以一天或6小时的频率输入给继承自问题二与问题三的模型进行重现。
+求解结果相较恒定电价的第二三问分别仅提升了4.8\%和5.1\%。板块中还论述了本文
+将两复现任务使用同一模型池构建的原因，以及实际更新思路。
+
+
+
+\textbf{关键词：}\ 微网；储能调度；线性规划；EGD；对偶分析；随机分析
 
 \newpage
+% 正文自本页起重新计数，页码显示为 1
+\setcounter{page}{1}
 % ===================== 1 问题重述 =====================
 \section{问题重述}
 
@@ -152,7 +171,7 @@
 \begin{center}
 \begin{tabular}{@{}p{2.6cm}p{4.4cm}@{\hspace{1.5em}}p{2.6cm}p{4.4cm}@{}}
 \toprule
-\multicolumn{4}{c}{符号说明} \\
+符号 & 说明 & 符号 & 说明 \\
 \midrule
 $\Delta t$ & 单时段 10 min & $R_t$ & 实际总供给 \\
 $I_k$ & 第 $k$ 个时段 & $e_t$ & 供电缺口 \\
@@ -206,7 +225,7 @@ $P_t$ & 光伏实际功率 & $g_t^{r}$ & 实际光伏直供 \\
 外网购电可能根据存贮计划分流，一部分可转向储电设备并以90\%的效率存储 $b_t$ ，另一部分考虑可以直接转向小区负载供电 $a_t$ 以减少损耗率；
 
 \textbf{光伏发电} \ \  类似的，小区内光伏发电的功率同样进行拆分，拆成直供负载的 $g_t$ 与储能充电 $c_t$ 两路，后者同样存在90\%效率的能量转换。
-而由于光伏发电为被动来源，在储能设备几乎存满且负载低的极端情况下，可能出现废弃的光能功率，光伏与储能的协同调度正是处理这类消纳问题的常见框架~\cite{yuanlong2018}。
+而由于光伏发电为被动来源，在储能设备几乎存满且负载低的极端情况下，可能出现废弃的光能功率，光伏与储能的协同调度正是处理这类消纳问题的常见框架~\upcite{yuanlong2018}。
 
 \textbf{储能供电} \ \  储能设备可以将通过外购和光伏存入的能量再以90\%的效率输出，为小区负载供电。我们记放电总功率为 $d_t$。同时，每个时刻的储电量 $E_t$ 由充放电累计得到
 
@@ -321,12 +340,12 @@ LP 的对偶变量给出比数值解更深一层的解释。我们给各类约�
 \gamma_t=\gamma_{t+1}-\eta_t+\theta_t ,
 \label{eq:gamma}
 \end{equation}
-其中 $\eta_t$、$\theta_t$ 是储电量上、下限约束的对偶变量。内点节点上 $\gamma$ 逐段不变，能量躺在罐里不生息；满罐节点 $\gamma$ 下移 $\eta_t$，空罐节点 $\gamma$ 上移 $\theta_t$。由 KKT 互补松弛条件可得充放电的三条启停判据，对偶理论见文献~\cite{boyd2004}。充电段满足 $\lambda_t=0.9\gamma_t$，功率顶格段另加正的影子溢价；放电段满足 $\sigma_t=\gamma_t/0.9$，$\sigma_t$ 为该段边际供电成本；空闲段的价格落在 $0.9\gamma_t$ 与 $\gamma_t/0.9$ 之间的迟滞带内。把充、放电段的等式联立，可得跨窗口搬运能量的门槛，放电价与充电价之比须不低于
+其中 $\eta_t$、$\theta_t$ 是储电量上、下限约束的对偶变量。内点节点上 $\gamma$ 逐段不变，能量躺在罐里不生息；满罐节点 $\gamma$ 下移 $\eta_t$，空罐节点 $\gamma$ 上移 $\theta_t$。由 KKT 互补松弛条件可得充放电的三条启停判据，对偶理论见文献~\upcite{boyd2004}。充电段满足 $\lambda_t=0.9\gamma_t$，功率顶格段另加正的影子溢价；放电段满足 $\sigma_t=\gamma_t/0.9$，$\sigma_t$ 为该段边际供电成本；空闲段的价格落在 $0.9\gamma_t$ 与 $\gamma_t/0.9$ 之间的迟滞带内。把充、放电段的等式联立，可得跨窗口搬运能量的门槛，放电价与充电价之比须不低于
 \begin{equation}
 \frac{1}{0.81}\approx 1.235 .
 \label{eq:th}
 \end{equation}
-说白了，价差比不到 1.235 的两段之间，LP 一千瓦时也不会搬。同一段内边充边放的情形可以先用损耗的账排除。取充分小的 $\delta$，若某段同时有 $b_t>0$ 与 $d_t>0$，把充电减 $\delta$、放电减 $0.81\delta$、直购增 $0.81\delta$，储电量轨迹逐点不变，购电费净省 $0.19\,\lambda_t\,\delta\,\Delta t$，只要电价为正，原解就还不是最优。对偶条件给出同一结论，边充边放要求 $\lambda_t=0.9\gamma_t$ 与 $\lambda_t=\gamma_t/0.9$ 同时成立，推出 $\gamma_t=0$ 且 $\lambda_t=0$，与恒正的电价矛盾。故最优解中不存在同段充放，无需为排除该行为引入 0-1 变量，这与文献~\cite{wangxz2017} 用状态变量处理储能充放互斥的做法形成对照。
+说白了，价差比不到 1.235 的两段之间，LP 一千瓦时也不会搬。同一段内边充边放的情形可以先用损耗的账排除。取充分小的 $\delta$，若某段同时有 $b_t>0$ 与 $d_t>0$，把充电减 $\delta$、放电减 $0.81\delta$、直购增 $0.81\delta$，储电量轨迹逐点不变，购电费净省 $0.19\,\lambda_t\,\delta\,\Delta t$，只要电价为正，原解就还不是最优。对偶条件给出同一结论，边充边放要求 $\lambda_t=0.9\gamma_t$ 与 $\lambda_t=\gamma_t/0.9$ 同时成立，推出 $\gamma_t=0$ 且 $\lambda_t=0$，与恒正的电价矛盾。故最优解中不存在同段充放，无需为排除该行为引入 0-1 变量，这与文献~\upcite{wangxz2017} 用状态变量处理储能充放互斥的做法形成对照。
 
 图~\ref{fig:shadow} 画出 $\gamma$ 与 $\lambda$ 的全天对比，底色可区分出充放电窗口，有以下两处结构值得讨论。
 
@@ -377,8 +396,8 @@ $\eta$ & 阈值 $1/\eta^2$ & 购电费/元 & 较 $\eta=0.90$ \\
 \end{table}
 
 \textbf{功率上限 $P_{\max}$} \ \  分析可得，解中有 19 个时段的充电功率顶在 5000~kW，该约束频繁激活，值得单独查验。
-把 $P_{\max}$ 放宽到 6000~kW 重解，成本仅降 0.12\%。其看可能的原因是低价时段的总电量足以把储能设备充满，上限改变的只是充电在时段之间的分布，
-而不是充入的总量；放电峰值功率 4294~kW 从未触顶，两个方向中只有充电侧受到约束。而假设~2 中我们对于$P_{\max}$的并网侧理解与“电池侧”，认为时电池实际存入或输出的功率可达 $P_{\max}$，对结果的影响同样被限制在这一量级。
+把 $P_{\max}$ 放宽到 6000~kW 重解，成本仅降 0.12\%。其可能的原因是低价时段的总电量足以把储能设备充满，上限改变的只是充电在时段之间的分布，
+而不是充入的总量；放电峰值功率 4294~kW 从未触顶，两个方向中只有充电侧受到约束。
 
 % ===================== 6 问题2 =====================
 \section{问题2模型的建立与求解}
@@ -450,7 +469,7 @@ b.月度均值预测（HistMean）\ \ 取近 4 周同一时点的平均。对一
 c.STL\ \  作为时间序列经典方法，其以 7 天为周期把历史序列分解为趋势、季节与残差三部分，趋势分量以阻尼系数 0.8 外推，季节取上一周同相位值，残差置零。
 其具备专门处理月度均值学不到的水平迁移的能力，趋势项阻尼外推既能跟进漂移，又不受单日异常影响。
 
-d.kNN\ \  该方法以昨日完整曲线为基准，在近 60 天历史中取归一化欧氏距离最近的 3 个同星期几的日子，按距离倒数加权搬用它们的次日曲线~\cite{akyurek2014}。
+d.kNN\ \  该方法以昨日完整曲线为基准，在近 60 天历史中取归一化欧氏距离最近的 3 个同星期几的日子，按距离倒数加权搬用它们的次日曲线~\upcite{akyurek2014}。
 此方法可以降低次日曲线单步 MAE，小区负载常出现相同用电结构在不同的时间出现，直接通过kNN匹配相似日可以很好的处理这种情况。
 
 e.LightGBM\ \  池中唯一的非线性模型，其强大的机器学习能力用于捕捉突发事件等引发的非线性信息，树结构可以表达特征之间的交互，空调季、周末、午间三者组合出的模式是周期模型写不出的。。我们对其的训练结果如下：
@@ -490,14 +509,14 @@ e.LightGBM\ \ 特征工程与负载模型池中的一致,光伏侧的非线性�
 w_{t+1,i}=\frac{w_{t,i}\,\exp(-\mu\,\tilde\ell_{t,i})}{\sum_j w_{t,j}\,\exp(-\mu\,\tilde\ell_{t,j})},
 \label{eq:egd}
 \end{equation}
-其中 $\tilde\ell_{t,i}$ 为模型 $i$ 的局部核加权损失；且学习率 $\mu$ 不作搜索遍历，而是按指数加权策略的理论，取最优量级 $\mu^{*}=\ln N/T$ 。
+其中 $\tilde\ell_{t,i}$ 为模型 $i$ 的局部核加权损失；且学习率 $\mu$ 不作搜索遍历，而是按指数加权策略的理论，取最优量级 $\mu^{*}=\ln N/T$~\upcite{guohs2026} 。
 在本场景中， $N=5$ 为池内成员数、$T=334$ 为评估天数，$\ln 5/334\approx0.0048$，故取 $\mu=0.005$。
 
 通过EGD的指数梯度下降逻辑，当日误差大的模型被指数地压低了，使误差小的成员模型权重上升，并将分母归一化以保证权重始终构成一个概率分布。
 其中，学习率取得较小，以保证让权重随时间的漂移速度不能过快，避免偶然大误差瞬间某个成员模型的权重。
 
-该时变权重集成的框架来自于在线学习里 Hedge 算法的指数加权策略~\cite{zhang2023onenet}，且其已经被
-证明具有最优 regret 界~\cite{mourtada2019}。在该框架下，累积损失至多比事后最优的成员
+该时变权重集成的框架来自于在线学习里 Hedge 算法的指数加权策略~\upcite{zhang2023onenet}，且其已经被
+证明具有最优 regret 界~\upcite{mourtada2019}。在该框架下，累积损失至多比事后最优的成员
 多出 $O(\sqrt{T\log N})$ 量级。
 所以，即使伴随季节切换及其引发的权重迁移，EGD时变赋权下的总损失与日前已知当日数据的理想情形，
 只存在一个随天数缓慢增长的小量差距，这对赋权
@@ -511,7 +530,7 @@ w_{t+1,i}=\frac{w_{t,i}\,\exp(-\mu\,\tilde\ell_{t,i})}{\sum_j w_{t,j}\,\exp(-\mu
 \label{eq:kernel}
 \end{equation}
 其中，衰减系数取 0.95 会导致当天的权重约为 30 天前的四倍。这可以让模型池更倾向通过近期的场景特征来选择赋权策略，同时也保留稍远时点，如一两周前的影响。
-这一局部窗加权的思路取自时变模型平均 TVJMA~\cite{sun2021tvjma}，它用每个时点附近的局部信息挑选合成权重，而不是在全样本上定一套固定权重，
+这一局部窗加权的思路取自时变模型平均 TVJMA~\upcite{sun2021tvjma}，它用每个时点附近的局部信息挑选合成权重，而不是在全样本上定一套固定权重，
 与我们逐日更新的需求达成好匹配。
 
 在算出日均损失后对每日做归一化，以避免在光伏误差整体偏大的阴雨月份，
@@ -526,10 +545,10 @@ w_t\leftarrow \alpha\,w_{\mathrm{init}}+(1-\alpha)\,w_t,\qquad \alpha=\max\Bigl(
 \end{equation}
 其中， $d$ 为已训练天数。在最初的冷启动阶段，由于数据太少$d<35$ ， $\alpha$ 偏大
 权重被拉回一个偏向简单方法的起点；而随着数据量的增加啊，后续的 $\alpha$ 衰减到 0.05 的下限，
-只保留一点微弱的复位，不再打扰已经学稳的权重。即长线的在线更新负责跟踪学习，周期性的复位负责切换\cite{zhang2023onenet}
+只保留一点微弱的复位，不再打扰已经学稳的权重。即长线的在线更新负责跟踪学习，周期性的复位负责切换\upcite{zhang2023onenet}
 
 \textbf{冷启动权重与滚动训练}\ \ 在初始训练时只有 31 天数据，机器学习成员模型学习效果不佳，
-而简单平均在高不确定性下反而更稳~\cite{graefe2015}。故据此让初始权重偏向简单方法，具体冷启动结果见下表。
+而简单平均在高不确定性下反而更稳~\upcite{graefe2015}。故据此让初始权重偏向简单方法，具体冷启动结果见下表。
 
 \begin{table}[htbp]
 \centering
@@ -717,7 +736,7 @@ e_t=\max\bigl(0,\;L_t-R_t\bigr),\qquad C_t^{\mathrm{e}}=5\lambda_t\,e_t\,\Delta 
  年 2 月 1 日至 12 月 31 日共 334 天计划求解与实际数据结算。以 0.833 为中心、步长 0.02 遍历 $[0.733,0.933]$，
  再在 $0.78$~$0.86$ 内进一步以 0.01 为步长细化。
  
- 遍历结果显示，计划成本在 $\tau=0.81$ 处最低 1495.38 万元，故取 $\tau=0.81$ 作为决策分位。
+ 遍历结果显示，计划成本在 $\tau=0.81$ 处最低 1638.75 万元，故取 $\tau=0.81$ 作为决策分位。
  
 
 按 $\tau=0.81$ 对 2025 年 2 月 1 日至 12 月 31 日逐日制定计划购电策略并按实际数据。
@@ -733,7 +752,7 @@ e_t=\max\bigl(0,\;L_t-R_t\bigr),\qquad C_t^{\mathrm{e}}=5\lambda_t\,e_t\,\Delta 
 
 \begin{table}[htbp]
 \centering
-\caption{三组预测来源的全年模型对比（2025.2.1--12.31，费用单位：万元）}
+\caption{三组预测来源的全年模型对比}
 {\small
 \begin{tabular}{lccc}
 \toprule
@@ -754,7 +773,7 @@ LSTM 组 & 1633.96 & 2829.85 & 3,661,104 \\
 其计划购电费虽为三组中最低，却因缺口多付了数倍于计划费节省的紧急费用，
 成本反而最高。
 
- 为三组预测来源的月度紧急购电费用.可见,即使三组的紧急费都随月份波动趋势相同，但是本模型在2月，6月
+由下图三组预测来源的月度紧急购电费用可见,即使三组的紧急费都随月份波动趋势相同，但是本模型在2月，6月
 等换季时间点上具有对于Xgboost与LSTM的显著优势。
 \begin{figure}[htbp]
 \centering
@@ -947,16 +966,6 @@ VSS较大进一步说明本随机规划的有效性。
 \textbf{真实预报的实际增量}\ \ 上界描述的是预报完美时的价值，
 但实际无法达到，实际预报价值由启用族给出。
 
-将日内调整的次数依次增加，同一条模型族的成本严格递减，见表~\ref{tab:p3sess}。
-相邻两次的增量即为该次预报的边际价值，从表中可见三次全为正即均有价值。特别的，我们海岸18:00 一次的实际增量 11.71 万元，
-略高于它的完美信息价值 9.63 万元，正说明它的价值里有相当一部分来自多一次调整机会本身，而不只是预报更准。
-
-这一指标直接说明了\textbf{引入 6:00、12:00、18:00 的预报均值得，且以12:00预报价值最高}。进一步分析结果，
-两种度量都把 12:00 排在日内第一，其原因 可能是12:00 的预报修正的是午后到晚上，这段含晚峰的高电价，
-而发布时间不算很近、提前量短而精度高，
-一次修正能同时改购电量与充放电安排。6:00 的预报看得更远、上界更高，但它离晚峰尚远，之后的会话还会把它覆盖掉，
-实际兑现的比例因此偏低。18:00 只剩晚间数小时，光伏趋零，故实际增量最低。
-
 \begin{table}[htbp]
 \centering
 \caption{各会话预报的完美信息价值与实际增量}
@@ -975,6 +984,18 @@ VSS较大进一步说明本随机规划的有效性。
 \end{tabular}}
 \label{tab:p3sess}
 \end{table}
+
+
+
+将日内调整的次数依次增加，同一条模型族的成本严格递减，见表~\ref{tab:p3sess}。
+相邻两次的增量即为该次预报的边际价值，从表中可见三次全为正即均有价值。特别的，我们海岸18:00 一次的实际增量 11.71 万元，
+略高于它的完美信息价值 9.63 万元，正说明它的价值里有相当一部分来自多一次调整机会本身，而不只是预报更准。
+
+这一指标直接说明了\textbf{引入 6:00、12:00、18:00 的预报均值得，且以12:00预报价值最高}。进一步分析结果，
+两种度量都把 12:00 排在日内第一，其原因 可能是12:00 的预报修正的是午后到晚上，这段含晚峰的高电价，
+而发布时间不算很近、提前量短而精度高，
+一次修正能同时改购电量与充放电安排。6:00 的预报看得更远、上界更高，但它离晚峰尚远，之后的会话还会把它覆盖掉，
+实际兑现的比例因此偏低。18:00 只剩晚间数小时，光伏趋零，故实际增量最低。
 
 \textbf{价值瀑布图分析}\ \ 下图的价值瀑布将整个问题三的信息统合，清晰的表现各方案的实际求解结果，这也可以说明模型改进的有效性。
 以问题~2 的日前计划为基线，换用原始附件~3 预报的四阶段模型费用为 1451.00 万元，换上去偏与融合的中心降到 1344.15 万元，
@@ -1002,123 +1023,187 @@ VSS较大进一步说明本随机规划的有效性。
 说明最差日子内部费用彼此相近、不存在个别极端日把条件均值远超阈值的尾部，
 策略的低期望费用并不存在极端差解的代价。
 
-
 \section{问题4模型的建立与求解}
-问题四较问题二和问题三更进一步，要求在有每天电价随时间波动的情况下重新计算问题二和问题三。
+本问较问题二和问题三更进一步，要求在电价随时间波动的情况下重新计算问题二、三的场景问题。
 
-据此，我们需要对电价的波动进行预测，同时在问题二，问题三中由于对调整购电策略的频率不同，问题二每 24 小时调整一次，而问题三则每 6 小时调整一次。
-基于二者购电策略频率的不同，我们需要对电价的预测频率进行调整，问题二 24 小时 更新一次，问题三 6 小时 滚动更新一次。
+据此，我们拟对要对电价进行类似问题二负载或光伏的日前或准点预测。同时，考虑到由于对调整购电策略的频率不同，即
+问题二每 24 小时调整一次，而问题三则每 6 小时调整一次，显然在代入计算的电价预测需要不同的更新频率。
 除更新频率外，问题四的模型与问题二和问题三的模型基本一致。
-流程图如下图~\ref{fig:p4flow}所示。
+流程图如下图所示。
 
 \begin{figure}[htbp]
 \centering
 \includegraphics[width=0.95\textwidth]{p4_workflow.png}
-\caption{问题~3 的随机规划建模与求解流程}
+\caption{问题~4 的建模与求解流程}
 \label{fig:p4flow}
 \end{figure}
 
 \subsection{基于电价特征的模型池重构}
 
 \subsubsection{电价序列特征分析}
-为了选取适合预测电价波动的模型，我们对电价序列的特征进行了初步分析，得出电价波动具有以下的特征：
-a.电价波动以单周为周期。\ \ 对电价日均值的周期特征进行分析，发现滞后 7 天的自相关系数高达 0.963，显著高于其他滞后阶数，表明其具有明显的周周期特征。
+为了选取适合预测电价波动的模型，我们对电价序列的特征进行了分析探索，初步认为电价波动具有以下的特征：
 
-b.电价在单天内的波动形状高度稳定\ \ 正午形成深谷，20时前后出现晚峰，峰谷比约3.8倍，主形状占日内方差的绝大部分；但每天的形状相对平均形状仍有约 9\% 的平滑形变，并非固定不变。
+a.\textbf{电价波动具周周期性}\ \ 对电价日均值的周期特征进行分析，发现滞后 7 天的自相关系数高达 0.963，显著高于其他滞后阶数，表明其具有明显的周周期特征。
 
-c.电价在星期和月初两个维度上呈现出规律性差异\ \   按星期看，每周固定两天日均价系统性偏低约 23\%，且工作日和周末分成两档；
-按月初看，每月月初电价水平会显著波动，导致这段时间预测误差明显偏高。
+b.\textbf{电价单天内的波动形状高度稳定}\ \ 正午形成深谷，20时前后出现晚峰，峰谷比约3.8倍，主形状占日内方差的绝大部分；但每天的形状相对平均形状仍有约 9\% 的平滑形变，并非固定不变。
 
-d.当日整体水平是决定电价高低的主要因素\ \  电价的日内形状虽然稳定，但一天贵不贵主要取决于当天的整体水平，而非形状本身。
+c.\textbf{电价有明显周内波动}\ \   按星期看，经过数据统计，每周周末日均价系统性偏低约 23\%，该特征可以很好的为后续模型需要学习前周对应日子提供基础；
+
+d.\textbf{电价在月初常有异常波动}\ \ 关注多个月初时段的数据表现，每月月初电价水平会显著波动，导致这段时间预测误差明显偏高。
+
+e.\textbf{当日整体水平是决定电价高低的主要因素}\ \  电价的日内形状虽然稳定，但一天贵不贵主要取决于当天的整体水平，而非形状本身。本特征为后续提供整点预测基于当天已有时间数据矫正预测提供基础。
 
 \subsubsection{成员模型选择}
 
-基于上述对电价序列特征的分析，我们选择了以下成员模型：
-a.基于同星期类型日的指数加权模型\ \ 电价波动以单周为周期，
+结合上述对电价序列特征的分析，本文查阅了部分电价场景的文章并选择了以下成员模型：
+
+a.\textbf{同星期类型日的指数加权}\ \ 电价波动以单周为周期，
 故取多条同星期类型日曲线并按时间距离加权，可避免把结果押在单日上，在保留周周期响应的同时缓冲月初跳变。
-b.基于形状—水平分解的方法   \ \ 电价在单天内的波动形状高度稳定，且固定形状的预测误差反而劣于朴素基线。
+
+b.\textbf{形状—水平分解预测}   \ \ 电价在单天内的波动形状高度稳定，且固定形状的预测误差反而劣于朴素基线。
 将电价拆成日水平 × 归一化形状分别估计，可在保留日内结构的同时允许形状随近窗缓慢演化。
-c.基于日历与水平漂移特征的逐时段 LightGBM 模型   \ \  电价在星期和月初两个维度上呈现出规律性差异，
-LightGBM 能同时处理这三类信息，且对小样本与缺失稳健，是四个成员中唯一显式刻画日历与水平漂移的模型，对应规律 3；其在现货出清价预测中的有效性已有中文文献支撑[3]。
-d.基于相似日检索的 kNN 模型   \ \  电价波动以单周为周期，且在单天内的波动形状高度稳定。
+
+c.\textbf{LightGBM}   \ \  电价在星期和月初两个维度上呈现出规律性差异，
+基于日历与水平漂移特征的逐时段 LightGB 能同时处理这三类信息，且对小样本与缺失稳健，是四个成员中唯一显式刻画日历与水平漂移的模型。其在现货出清价预测中已被证明具有高有效性与可靠性~\upcite{shaoy2025}。
+
+d.\textbf{kNN}    \ \  电价波动以单周为周期，且在单天内的波动形状高度稳定。
 相似日 kNN 无需训练，直接以归一化曲线与日水平检索最接近的历史日并加权合成，能在样本不足时提供可靠兜底，与其他三个成员形成互补。
 
 \subsubsection{模型预测频率的调整}
-本问对问题二、问题三的重新预测采用完全相同的一套预测模型，仅调用频率不同，即：
 
-\textbf{问题二（24\,h 一次）}：每天 0:00，在仅见历史的条件下一次性输出全天 144 段；
+本文并未在问题二、问题三的重现前预测工作中尝试建立不同的模型，而是选择直接建立基于6h更新频率的一套EGD赋权模型池来进行预测。
+其原因在于问题三新增的预报和调整机制后并未改变对电价预测的预测倾向，即第二三问需求的预测模型完全基于电价数据本身特征进行构建，并不存在问题三
+需要电价的预测值出现特定定向矫正。故，两复现任务的预测模型应出自完全相同的模型池构建，仅调用频率不同，即：
 
-\textbf{问题三（6\,h 一次）}：0:00 输出同问题二；6/12/18 点会话时，当天前 36/72/108 段已实现，用同一模型把新信息并入、刷新剩余时段。
+\textbf{问题二需24\,h 一次}：每天 0:00，在仅见历史的条件下一次性输出全天 144 段；
 
-\subsection{重构模型评价}
-采用电力价格预测公认的滚动日前评估：评估期 334 天，预测第 d 天只用 d 之前数
-据；以最强朴素基线 naive-week 为锚报告相对误差 rMAE=MAE/MAE(nw)；用 Wilcoxon 符号秩检验判
-断改进的统计显著性
+\textbf{问题三需6\,h 一次}：0:00 输出同上，而在6，12，18 点预报调整时，当天前 36，72，108 段已实现，用同一模型把新信息并入、刷新剩余时段。
+
+在实际编程实现的过程中，我们实际上完成了每6h更新的模型，其兼容24h更新的输出。
+
+
+
+\subsection{重构预测模型评价}
+
+
 \subsubsection{模型结果对比}
-结果见表 1。以MAE和rMAE为指标，预测模型池中的四个模型均优于基线 naive-week，且EDG集成为全
-AE为 0.88，显著优于基线。
-表 1　日前预测精度（334 天，MAE×10³ 元/kWh）
+前文在对电价序列特征的分析中发现，滞后一周的自相关系数高达 0.963，电价波动以单周为周期，故我们以上周同天电价做预测值作为基线模型。
+同时为体现出模型池的有效性，还分别以模型池中四个成员模型的预测结果与基线进行对比，结果见表~\ref{tab:p4mae}。
+
+\begin{table}[htbp]
+\centering
+\caption{日前预测精度}
+{\small
+\begin{tabular}{lrr}
+\toprule
+模型 & MAE & rMAE \\
+\midrule
+上周同天电价做预测值 & 47.15 & 1.000 \\
+基于同星期类型日的指数加权模型 & 44.72 & 0.948 \\
+基于形状—水平分解的方法 & 46.93 & 0.995 \\
+LightGBM 模型 & 39.74 & 0.843 \\
+kNN 模型 & 45.40 & 0.963 \\
+EGD 集成 & \textbf{42.01} & \textbf{0.891} \\
+\bottomrule
+\end{tabular}}
+\label{tab:p4mae}
+\end{table}
+
+可见 EGD 模型全部占优，证明方法合理。
+
 \subsubsection{评估引入负载及光伏预测值}
-阅读相关文献，发现负载通常会与电价呈现正相关，与光伏功率成负相关，因此在训练前加入负载、光伏预测特征，计算得出LightGBM 的 MAE 由 39.23×10⁻³ 反升到 39.53×10⁻³（变差 0.77%），
-而加入预测同样代表了引入误差，故故最终采用纯电价自包含方案。
+行业相关研究有显示，电价的波动往往与供电场景下的多因素相耦合~\upcite{shaoy2025}，这启发本小组用负载及光伏预测值作为辅助因素来提升电价预测精度。
+但同时也考虑到在 0:00 决策时，负载和光伏本身也是带误差的预测值，直接加入未必有益。
+
+因此，本文在训练与部署一致的前提下，将日前负载、光伏预测特征加入 LightGBM，结果 MAE 由 $39.23\times10^{-3}$ 反升至 $39.53\times10^{-3}$ 元/kWh，变差 0.77\%。
+因此不将负载、光伏预测值作为特征加入模型，避免引入噪声。
 
 \subsubsection{过拟合检验}
-针对树模型可能的过拟合与在线集成可能的调参窥探，做三项检验（`overfitcheck.py`）
-(1) 训练—样本外误差差与树复杂度。 固定其余参数、只改树复杂度，结果见表 2：训练误差随复杂度单调下降（29.3→18.6），但样本外误差在浅模型处即达最优、越深反而越差（39.22→39.75），训练—样本外差（gap）由 9.96 扩大到 21.18——这正是过拟合的典型信号。本文主配（31 叶）样本外 39.23，与最浅模型 39.22 几乎持平，落在平坦最优区，主动避开了高复杂度过拟合区。
-表 2　LightGBM 复杂度—训练/样本外误差（MAE×10³）
-配置	    训练 MAE	样本外 MAE	  gap
-浅（15 叶）	  29.26	  39.22	     9.96
-主配（31 叶）	27.21	  39.23	     12.03
-深（63 叶）	  25.44	  39.61	     14.17
-深且无正则	  18.57	  39.75	     21.18
+
+模型池结合各不同学习特征模型，较易发生过拟合。为此，我们对其进行检验。
+
+（1）LightGBM 树模型天然有过拟合风险，当树越深、叶子越多，训练误差越低，但样本外误差可能反而变差，只看训练误差会误以为越复杂越好。
+
+（2）在线集成有调参窥探风险，即 EGD 的学习率 $\eta$，$\eta$ 若是在评估集上试出来的，EGD 集成后的预测误差，比基线以单周为周期预测的电价波动的误差更低的结论就不成立。
+
+（3）从整体上来看全年占优，但可能是由于个别月份碰巧拟合程度好，不一定做到处处局部最优。
+
+基于上述因素，需展开三方面的稳健性检验：
+
+(1) 固定其余参数、只改树复杂度，结果见表~\ref{tab:p4overfit}：训练误差随复杂度单调下降，从 29.3 降至 18.6，但样本外误差在浅模型处最优、越深越差，从 39.22 升至 39.75，是过拟合的典型信号。本文主配为 31 叶，样本外 39.23，与最浅模型的 39.22 基本持平，处于平坦最优区，避开了高复杂度过拟合区。
 
 
-\subsubsection{学习率取值评估}
+\begin{table}[htbp]
+\centering
+\caption{LightGBM 复杂度—训练/样本外误差}
+{\small
+\begin{tabular}{lrrr}
+\toprule
+配置 & 训练 MAE & 样本外 MAE & 差值 \\
+\midrule
+浅（15 叶） & 29.26 & \textbf{39.22} & 9.96 \\
+主配（31 叶） & 27.21 & 39.23 & 12.03 \\
+深（63 叶） & 25.44 & 39.61 & 14.17 \\
+深且无正则 & 18.57 & 39.75 & 21.18 \\
+\bottomrule
+\end{tabular}}
+\label{tab:p4overfit}
+\end{table}
 
+(2) 以 2 至 7 月选 EGD 学习率，再以 8 至 12 月纯样本外检验，结果见表~\ref{tab:p4eta}。$\eta$ 在 0.02 到 0.40 的大区间中，后半段样本外 MAE 为 38.17 到 42.21，全部远低于以上周同天电价做预测值模型的后半段的 46.25；即便取最大的 0.40，后段仍占优 17.5\%。说明“集成优于基线”不依赖对 $\eta$ 的精细调参。本文取 $\eta$ 等于 0.10，数值温和，是为保留集成结构的可辩护性，而非追求测试集最优。
+
+
+
+\begin{table}[htbp]
+\centering
+\caption{EGD 学习率前/后半段样本外 MAE}
+{\small
+\begin{tabular}{lrrr}
+\toprule
+$\eta$ & 前段 & 后段 & 全段 \\
+\midrule
+0.02 & 44.38 & 42.21 & 43.29 \\
+0.05 & 44.20 & 41.48 & 42.84 \\
+\textbf{0.10} & \textbf{43.87} & \textbf{40.14} & \textbf{42.01} \\
+0.20 & 43.13 & 38.54 & 40.83 \\
+0.40 & 42.02 & 38.17 & 40.09 \\
+\bottomrule
+\end{tabular}}
+\label{tab:p4eta}
+\end{table}
+
+(3) 逐月计算误差，检验优势是否每月成立，表~\ref{tab:p4monthly} 显示11 个月中有 10 个月 EGD 的 rMAE 小于 1，稳定占优；
+唯一例外是首月 2 月，rMAE 为 1.123，原因是紧邻 1 月冷启动、样本最少、权重尚在收敛，自 3 月起逐月占优。
+这说明模型靠的是可泛化结构，而非对某些月份的偶然拟合。
+
+\begin{table}[htbp]
+\centering
+\caption{部分分月样本外稳定性}
+{\small
+\begin{tabular}{lccccccc}
+\toprule
+月 & 2 & 3 & 5 & 7 & 9 & 11 & 12 \\
+\midrule
+rMAE & 1.123 & 0.893 & 0.793 & 0.909 & 0.891 & 0.867 & 0.919 \\
+EGD 胜天/总天 & 9/28 & 29/31 & 31/31 & 26/31 & 26/30 & 29/30 & 27/31 \\
+\bottomrule
+\end{tabular}}
+\label{tab:p4monthly}
+\end{table}
 
 \subsection{前问复现}
 
-如上文所述，本问较问题二、问题三仅在电价上做出实时变化，其余部分与问题二、问题三的模型基本一致，故仍沿用问题二、问题三的求解模型。唯一的变化在于电价预测值需实时更新：问题二以 24~h 为周期，问题三以 6~h 为周期，其余设定不变。因此本节只需将 8.1 节中得出的电价预测值代入问题二、问题三的模型中，即可完成复现求解。
+如上文所述，本问较问题二、问题三仅在电价上做出实时变化，其余部分与问题二、问题三的模型基本一致，故仍沿用问题二、问题三的求解模型。
+唯一的变化在于电价预测值需通过基于电价特征的EGD加权模型池实时更新，且问题二以 24~h 为周期，问题三以 6~h 为周期，在非00:00更新时学习当日已发生时间的数据。
+其余目标、约束等均不变。因此本节只需将 8.1 节中得出的电价预测值代入问题二、问题三的模型中，即可完成复现求解。
 
-\subsubsection{问题二复现}
+\textbf{问题二复现}\ \ 将上文所得的 24~h 周期电价预测值代入问题二的逐日 LP 求解模型，得到问题二的复现结果为全年1722.22万元，相较于恒定电价的1638.75万元仅提升4.8\%。
 
-将上文所得的 24~h 周期电价预测值代入问题二的逐日 LP 求解模型，得到问题二的复现结果如表~\ref{tab:p4p2result} 所示。
+相关复现代码见附录~B.4 的 \texttt{code/P4\_solve2.py}。
 
-\begin{table}[htbp]
-\centering
-\caption{问题二全年费用（费用单位：万元）}
-{\small
-\begin{tabular}{lr}
-\toprule
-电价方案 & 成本 \\
-\midrule
-EGD日前电价 & \textbf{1722.22} \\
-以上周同天电价做预测值 & 1726.01 \\
-\bottomrule
-\end{tabular}}
-\label{tab:p4p2result}
-\end{table}
+\textbf{问题三复现}\ \ 将上文所得的 6~h 周期电价预测值代入问题三的四阶段随机规划求解模型，得到问题三的复现结果为1546.52万元，相较于恒定电价的问题三结果仅提升5.1\%。
 
-\subsubsection{问题三复现}
-
-将上文所得的 6~h 周期电价预测值代入问题三的四阶段随机规划求解模型，得到问题三的复现结果如表~\ref{tab:p4p3result} 所示。
-
-\begin{table}[htbp]
-\centering
-\caption{问题三全年费用（费用单位：万元，紧急购电量单位：万kWh）}
-{\small
-\begin{tabular}{lrrrrr}
-\toprule
-电价方案 & 购电费 & 偏差费 & 紧急购电费 & 总费用 & 紧急购电量 \\
-\midrule
-四会话滚动更新 & 1328.97 & 21.74 & 195.81 & \textbf{1546.52} & \textbf{35.07} \\
-以24小时为周期预测电价 & 1329.01 & 21.75 & 195.81 & 1546.57 & 35.13 \\
-\bottomrule
-\end{tabular}}
-\label{tab:p4p3result}
-\end{table}
-
-
+相关复现代码见附录~B.4 的 \texttt{code/P4\_solve3.py}。
 
 
 % ===================== 9 模型评价与总结 =====================
@@ -1128,7 +1213,10 @@ EGD日前电价 & \textbf{1722.22} \\
 
 第一问中，在初步分析数据、梳理电能流及约束翻译之后，本文直接建立了LP模型并使用HiGHS精确求解，解得在指定时间外网购电中全天最低总购电费35126.85元，并对最优解对应的
 购电和充放电策略进行合理性分析。
-此外，为保证模型的科学性和解的可解释性，我们还进行了对偶分析及最优性证明，并从中得到...todo。考虑到储能设备的最大功率及效率等参数在现实中存在波动，
+此外，为保证模型的科学性和解的可解释性，我们还进行了对偶分析及最优性证明，
+并从中得到购电方案的价格机理解释，以及$10^{-17}$量级互补松弛与有限差分重解的
+双重最优性验证。
+考虑到储能设备的最大功率及效率等参数在现实中存在波动，
 本文通过对两参数完成灵敏度分析，保证在生产环境中，本模型不会因为参数偏而明显劣化。
 
 第二问中，LP可集成自问题一，问题重心转移为合理建立日前预测模型，在00:00建立计划时提供优越的当日负载及光伏发电量预测值。考虑到负载数据和光伏数据具有不同值得学习的数据特征，
@@ -1143,31 +1231,29 @@ EGD日前电价 & \textbf{1722.22} \\
 本文通过矫正系统误差后的预报与问题二EGD预测结果的融合数据进行误差分布建模，并生成随机规划需要的情景路径，最后基于3*3*3情景树建立模型
 以最优化期望总成本。采用HiGHS求解后进行了EVPI分解、会话消融等来量化评价预报重要性。结论是额外预报都有价值，12:00价值最高。
 
-第四中，需要额外对电价波动进行预测。本文基于其数据特征重构了模型池，并通过问题二类似检验。以一天或6小时两个频率的输出，分别完成了问题二三的复现。
+第四中，需要着重对电价波动进行预测。本文基于其数据特征重构了模型池，说明两复现工作可共用同一套模型池构建
+并通过问题二类似检验。以一天或6小时两个频率的输出，分别完成了问题二三的复现。
 
+
+\textbf{AI工具使用声明}\ \ 本参赛队在竞赛过程中使用了AI工具，主要用于【简要用途，如语言润色、代码调试等】，详细使用情况见支撑材料。
 \newpage
 % ===================== 参考文献 =====================
 {\small
 \begin{thebibliography}{10}
-\bibitem{wangxz2017} 王先齐, 吕智林, 汤泽琦. 基于分时电价机制的并网型微网多目标动态优化调度[J]. 电力系统保护与控制, 2017, 45(4). DOI: 10.7667/PSPC160250.
 \bibitem{yuanlong2018} 袁龙. 分布式光伏发电与储能协同调度模型研究[D]. 济南: 山东大学, 2018.
-\bibitem{sioshansi2009} Sioshansi R, Denholm P, Jenkin T, et al. Estimating the value of electricity storage in PJM: Arbitrage and some welfare effects[J]. Energy Economics, 2009, 31(2): 269-277.
-\bibitem{wangly2020} 王凌云, 王晓敏, 胡兴媛, 等. 基于多智能体微网的需求侧分时电价优化调度[J]. 信息与控制, 2020, 49(4): 429-435.
 \bibitem{boyd2004} Boyd S, Vandenberghe L. Convex Optimization[M]. Cambridge: Cambridge University Press, 2004.
-\bibitem{che2022} 车泉辉, 陈建洪. 光伏功率短期预测方法研究综述[J]. 电力自动化设备, 2022, 42(10): 12-21.
-\bibitem{arrow1951} Arrow K J, Harris T E, Marschak J. Optimal inventory policy[J]. Econometrica, 1951, 19(3): 250-272.
-\bibitem{cleveland1990} Cleveland R B, Cleveland W S, McRae J E, et al. STL: A seasonal-trend decomposition procedure based on Loess[J]. Journal of Official Statistics, 1990, 6(1): 3-73.
-\bibitem{lu2019} Lu J, Liu A, Dong F, et al. Learning under concept drift: A review[J]. IEEE Transactions on Knowledge and Data Engineering, 2019, 31(12): 2346-2363.
-\bibitem{wagnermuns2018} Wagner-Muns I M, Guardiola I G, Samaranayke V A, et al. A functional data analysis approach to traffic volume forecasting[J]. IEEE Transactions on Intelligent Transportation Systems, 2018, 19(3): 878-888.
+\bibitem{wangxz2017} 王先齐, 吕智林, 汤泽琦. 基于分时电价机制的并网型微网多目标动态优化调度[J]. 电力系统保护与控制, 2017, 45(4). DOI: 10.7667/PSPC160250.
 \bibitem{akyurek2014} Akyurek B O, Akyurek A S, Kleissl J, et al. TESLA: Taylor expanded solar analog forecasting[C]. 2014.
-\bibitem{mourtada2019} Mourtada J, Ga\"{i}ffas S. On the optimality of the Hedge algorithm in the stochastic regime[J]. Journal of Machine Learning Research, 2019, 20(83): 1-46.
-\bibitem{graefe2015} Graefe A, K\"{u}chenhoff H, Stierle V, et al. Combining forecasts: Evidence on the relative accuracy of the simple average and Bayesian model averaging[J]. Statistical Modelling, 2015.
-\bibitem{wang2019cqra} Wang Y, Zhang N, Tan Y, et al. Combining probabilistic load forecasts[J]. IEEE Transactions on Smart Grid, 2019, 10(4): 4477-4489.
+\bibitem{guohs2026} 郭虎升, 张旭, 张羽桐, 等. 多类型概念漂移引导的在线分时适应性集成[J]. 计算机研究与发展, 2026, 63(4): 987-997.
 \bibitem{zhang2023onenet} Zhang Y F, Wen Q, Wang X, et al. OneNet: Enhancing time series forecasting models under concept drift by online ensembling[C]//Advances in Neural Information Processing Systems (NeurIPS). 2023.
+\bibitem{mourtada2019} Mourtada J, Ga\"{i}ffas S. On the optimality of the Hedge algorithm in the stochastic regime[J]. Journal of Machine Learning Research, 2019, 20(83): 1-46.
 \bibitem{sun2021tvjma} Sun Y, Hong Y, Lee T H, et al. Time-varying model averaging[J]. Journal of Econometrics, 2021, 222(2): 974-992.
+\bibitem{graefe2015} Graefe A, K\"{u}chenhoff H, Stierle V, et al. Combining forecasts: Evidence on the relative accuracy of the simple average and Bayesian model averaging[J]. Statistical Modelling, 2015.
+\bibitem{shaoy2025} 邵云姝, 张琳, 周乃康, 等. 基于长短期记忆网络的电力市场价格预测研究[J]. 动力工程学报, 2025, 45(5): 733-737. DOI: 10.19805/j.cnki.jcspe.2025.250019.
 \end{thebibliography}
 }
 \appendix
+\newpage
 \section{求解数据表}
 
 \subsection{第一问求解结果}
@@ -1308,13 +1394,145 @@ EGD日前电价 & \textbf{1722.22} \\
 \end{tabular}}
 \label{tab:p3day3}
 \end{table}
+\newpage
+\section{代码清单}
 
+本节汇总本文四问实际使用的全部程序。程序名按 P1／P2a／P2b／P3／P4 统一编号，
+下划线后为说明性单词；语言均为 Python~3；全部程序存放于支撑材料 \texttt{support/code/}
+下，相对位置以 \texttt{support/} 为基准。
 
+\subsection{第一问涉及程序}
 
-% ===================== AI 使用声明（占位） =====================
-\section*{AI 工具使用声明}
-% TODO（2026 新规）：按竞赛当期规范声明 AI 工具的使用环节与方式，并在支撑材料中附
-% 《AI工具使用详情.pdf》（工具版本/目的环节/提示方式/采纳核验情况）。
-（占位）本项按竞赛当期规范填写。
+\noindent\begin{minipage}{\textwidth}
+\centering
+\captionof{table}{问题~1 求解程序}\label{tab:codeP1}
+{\footnotesize
+\begin{tabular}{@{}p{2.4cm}p{0.9cm}p{3.7cm}p{6.4cm}@{}}
+\toprule
+程序名 & 语言 & 相对位置 & 功能简述 \\
+\midrule
+P1\_solve & Python & \texttt{code/P1\_solve.py} & 问题~1 的 LP 建模、HiGHS 精确求解、对偶分析与最优性校验 \\
+P1\_greedy & Python & \texttt{code/P1\_greedy.py} & 规则式“谷充峰放”启发式对照，量化 LP 全局优化的价值 \\
+P1\_sensitivity & Python & \texttt{code/P1\_sensitivity.py} & 充放电效率 $\eta$ 与功率上限 $P_{\max}$ 的完整 LP 重解扫描 \\
+P1\_figs & Python & \texttt{code/P1\_figs.py} & 绘制数据总览、调度轨迹与节点边际价值图 \\
+\bottomrule
+\end{tabular}}
+\end{minipage}
+
+\subsection{第二问涉及程序}
+
+第二问分为日前预测（P2a）与计划优化与结算（P2b）两层，程序分列于表~\ref{tab:codeP2a}
+与表~\ref{tab:codeP2b}。
+
+\noindent\begin{minipage}{\textwidth}
+\centering
+\captionof{table}{问题~2 日前预测程序}\label{tab:codeP2a}
+{\footnotesize
+\begin{tabular}{@{}p{2.4cm}p{0.9cm}p{3.7cm}p{6.4cm}@{}}
+\toprule
+程序名 & 语言 & 相对位置 & 功能简述 \\
+\midrule
+P2a\_forecast & Python & \texttt{code/P2a\_forecast.py} & 负载与光伏异构模型池、EGD 时变权重集成的日前滚动预测主程序 \\
+P2a\_quantile & Python & \texttt{code/P2a\_quantile.py} & 基于滚动残差经验分位的分位数预测，对接报童最优分位 \\
+P2a\_ablation & Python & \texttt{code/P2a\_ablation.py} & 逐成员消融并重算 EGD 权重，考察各模型边际贡献 \\
+P2a\_overfit & Python & \texttt{code/P2a\_overfit.py} & 时序切分下 LightGBM 训练与测试误差比的过拟合诊断 \\
+P2a\_lstm & Python & \texttt{code/P2a\_lstm.py} & LSTM 单模型对照，检验纯时序基线相对模型池的差距 \\
+P2a\_xgb & Python & \texttt{code/P2a\_xgb.py} & XGBoost 单模型对照，提供第二组同管线预测来源 \\
+P2a\_test & Python & \texttt{code/P2a\_test.py} & 2--3 月快速回测，验证流程与精度后再执行全量预测 \\
+P2a\_evidence & Python & \texttt{code/P2a\_evidence.py} & 计算负载与光伏的时序特性统计量，为模型选型提供依据 \\
+\bottomrule
+\end{tabular}}
+\end{minipage}
+
+\noindent\begin{minipage}{\textwidth}
+\centering
+\captionof{table}{问题~2 计划优化与结算程序}\label{tab:codeP2b}
+{\footnotesize
+\begin{tabular}{@{}p{2.4cm}p{0.9cm}p{3.7cm}p{6.4cm}@{}}
+\toprule
+程序名 & 语言 & 相对位置 & 功能简述 \\
+\midrule
+P2b\_solve & Python & \texttt{code/P2b\_solve.py} & 三组预测来源逐日计划 LP 与实际结算，输出全年费用对比 \\
+P2b\_sweep & Python & \texttt{code/P2b\_sweep.py} & 决策分位 $\tau$ 的全年费用遍历，确定最优分位 0.81 \\
+P2b\_result & Python & \texttt{code/P2b\_result.py} & 按 $\tau=0.81$ 生成 result2.xlsx 及论文表~3 \\
+P2b\_figs & Python & \texttt{code/P2b\_figs.py} & 绘制三组来源费用对比、决策分位与月度紧急费用图 \\
+P2b\_check & Python & \texttt{code/P2b\_check.py} & 校验分位数交付物的形状、单调性与区间覆盖率 \\
+P2b\_probe & Python & \texttt{code/P2b\_probe.py} & 侦察预测残差结构与 5 倍电价的紧急购电风险敞口 \\
+P2b\_lstm & Python & \texttt{code/P2b\_lstm.py} & 本地代跑 LSTM 基线，生成对照组预测数组 \\
+P2b\_verify & Python & \texttt{code/P2b\_verify.py} & 独立复核 result2.xlsx 的结构、日期覆盖与守恒恒等式 \\
+\bottomrule
+\end{tabular}}
+\end{minipage}
+
+\subsection{第三问涉及程序}
+
+\noindent\begin{minipage}{\textwidth}
+\centering
+\captionof{table}{问题~3 随机规划求解程序}\label{tab:codeP3}
+{\footnotesize
+\begin{tabular}{@{}p{2.4cm}p{0.9cm}p{3.7cm}p{6.4cm}@{}}
+\toprule
+程序名 & 语言 & 相对位置 & 功能简述 \\
+\midrule
+P3\_correction & Python & \texttt{code/P3\_correction.py} & 附件~3 光伏预报按会话与步长分层的滚动去偏 \\
+P3\_fusion & Python & \texttt{code/P3\_fusion.py} & 矫正预报与 EGD 预测按会话逆均方误差加权融合 \\
+P3\_scenarios & Python & \texttt{code/P3\_scenarios.py} & 构造混合中心残差路径库并进行整日自助情景抽样 \\
+P3\_tree & Python & \texttt{code/P3\_tree.py} & 构建 $3\times3\times3$ 情景树并路由执行重解条件集 \\
+P3\_solve & Python & \texttt{code/P3\_solve.py} & 计划与三次调整联立的四阶段随机规划逐日求解 \\
+P3\_analysis & Python & \texttt{code/P3\_analysis.py} & EVPI／VSS 分解、会话信息价值与风险画像计算 \\
+P3\_report & Python & \texttt{code/P3\_report.py} & 汇总信息价值结论并绘制会话价值图 \\
+P3\_waterfall & Python & \texttt{code/P3\_waterfall.py} & 绘制问题~2 基线至完美信息下界的价值瀑布 \\
+P3\_figs & Python & \texttt{code/P3\_figs.py} & 绘制四阶段信息结构与各会话价值论文插图 \\
+P3\_audit\_m1 & Python & \texttt{code/P3\_audit\_m1.py} & 独立复核矫正层：会话顺序、窗口全扫与两源互补性 \\
+P3\_audit\_m3 & Python & \texttt{code/P3\_audit\_m3.py} & 独立复核情景层：慢漂移、相位与冷启动供体池 \\
+P3\_audit\_m4 & Python & \texttt{code/P3\_audit\_m4.py} & 独立复核情景树：条件集规模与储电量散布 \\
+P3\_audit\_m6 & Python & \texttt{code/P3\_audit\_m6.py} & 内生分位诊断，核对计划中位性与调整分位位置 \\
+\bottomrule
+\end{tabular}}
+\end{minipage}
+
+\subsection{第四问涉及程序}
+
+第四问在波动电价下预测电价并重算问题~2 与问题~3，程序同表~\ref{tab:codeP4}。
+
+\noindent\begin{minipage}{\textwidth}
+\centering
+\captionof{table}{问题~4 电价预测与重算程序}\label{tab:codeP4}
+{\footnotesize
+\begin{tabular}{@{}p{2.4cm}p{0.9cm}p{3.7cm}p{6.4cm}@{}}
+\toprule
+程序名 & 语言 & 相对位置 & 功能简述 \\
+\midrule
+P4\_forecast & Python & \texttt{code/P4\_forecast.py} & 基于电价特征的模型池与 EGD 时变赋权的日前／会话电价预测 \\
+P4\_test & Python & \texttt{code/P4\_test.py} & 电价预测池早期快速实验，确定问题~4-2 的预测层方案 \\
+P4\_solve2 & Python & \texttt{code/P4\_solve2.py} & 波动电价下重算问题~2，输出 result4-2 与三组电价对照 \\
+P4\_solve3 & Python & \texttt{code/P4\_solve3.py} & 波动电价下重算问题~3 的四阶段随机规划，输出 result4-3 \\
+P4\_ablation & Python & \texttt{code/P4\_ablation.py} & 电价模型池逐成员消融，考察各成员的边际贡献 \\
+P4\_audit & Python & \texttt{code/P4\_audit.py} & 附件~4 电价序列的结构、水平与噪声特征审计 \\
+P4\_verify & Python & \texttt{code/P4\_verify.py} & 独立复核 result4-3 的结构、取值与恒等式 \\
+\bottomrule
+\end{tabular}}
+\end{minipage}
+
+\section{结果文件}
+
+本节汇总题目要求的五个结果文件，均存放于支撑材料 \texttt{支撑文件/result/} 下，
+
+\noindent\begin{minipage}{\textwidth}
+\centering
+\captionof{table}{题目要求的五个结果文件}\label{tab:results}
+{\footnotesize
+\begin{tabular}{@{}p{3.0cm}p{3.7cm}p{8.3cm}@{}}
+\toprule
+文件名 & 相对位置 & 说明 \\
+\midrule
+result1.xlsx & \texttt{result/result1.xlsx} & 问题~1 全天计划购电量与储能充放电量 \\
+result2.xlsx & \texttt{result/result2.xlsx} & 问题~2 全年计划购电量、充放电量与紧急购电量 \\
+result3.xlsx & \texttt{result/result3.xlsx} & 问题~3 计划／调整购电量、充放电量与紧急购电量 \\
+result4-2.xlsx & \texttt{result/result4-2.xlsx} & 问题~4 波动电价下问题~2 重算的全部结果 \\
+result4-3.xlsx & \texttt{result/result4-3.xlsx} & 问题~4 波动电价下问题~3 重算的全部结果 \\
+\bottomrule
+\end{tabular}}
+\end{minipage}
 
 \end{document}
